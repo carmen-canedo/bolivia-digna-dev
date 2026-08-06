@@ -28,8 +28,18 @@ const {useState,useCallback,useEffect,useRef} = React;
 // a partir de la huella). Las credenciales reales (usuario + contraseña) se
 // entregan en un archivo aparte gestionado por coordinación.
 // Cada voluntario lleva "volId" que lo vincula con su ficha en INIT_VOLS.
+
+// Define SHA256 hashing function
 function sha256(ascii){
+
+  // Helper function to rotate 32 bit number to the right
+  // where value is the 32 bit number and amount is how many positions to rotate
+  // >>> is an unsigned right shift
+  // | bitwise OR
+  // << left shift
   function rightRotate(value, amount){return (value>>>amount)|(value<<(32-amount));}
+
+  // Declaration of 
   var mathPow=Math.pow, maxWord=mathPow(2,32), lengthProperty='length', i, j, result='';
   var words=[], asciiBitLength=ascii[lengthProperty]*8;
   var hash=sha256.h=sha256.h||[], k=sha256.k=sha256.k||[], primeCounter=k[lengthProperty];
@@ -479,6 +489,7 @@ const Login = ({ onLogin, passAdmin, passVoluntario }) => {
     
   };
 
+  // Array with two login modes for display purposes
   const demos = [
     { modo:"admin",      label:"Administrador", color:C.primary, icon:"🛡️" },
     { modo:"voluntario", label:"Voluntario/a",  color:C.green,   icon:"🙋" },
