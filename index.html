@@ -430,6 +430,7 @@ const NAV_GROUPS=[
 
 
 // ── Login ─────────────────────────────────────────────────────────────────────
+
 const Login = ({ onLogin, passAdmin, passVoluntario }) => {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
@@ -442,18 +443,40 @@ const Login = ({ onLogin, passAdmin, passVoluntario }) => {
   useEffect(() => { if (inputRef.current) inputRef.current.focus(); }, [modo]);
 
   const handleSubmit = (e) => {
+
+    // Stops browser's normal form submission behavior (normally HTML would reload the page)
     e.preventDefault();
+
+    // Clear previous error message
     setError("");
+
+    // Show loading spinner
     setLoading(true);
+
     setTimeout(() => {
+
+      // Remove spaces and make lowercase
       const key = usuario.trim().toLowerCase();
+
+      // Look up the user credentials based on the provided username
       const cred = resolverCred(key);
+
+      // If no user found
       if (!cred) { setError("Usuario no encontrado."); setLoading(false); return; }
+      
+      // If the user's role does not match the selected mode
       if (cred.role !== modo) { setError("Este usuario no tiene acceso a ese perfil."); setLoading(false); return; }
+      
+      // Determine the expected password based on the user's role
       const objetivo = cred.role==="admin" ? passAdmin : passVoluntario;
+
+      // Hash the entered password and compare it to the expected hash
       if (sha256(password) !== objetivo) { setError("Contraseña incorrecta."); setLoading(false); return; }
+      
+      // If all checks pass, call the parent component's onLogin function with the user's role, name, username, and volunteer ID
       onLogin({ role: cred.role, nombre: cred.nombre, usuario: key, volId: cred.volId });
     }, 400);
+    
   };
 
   const demos = [
