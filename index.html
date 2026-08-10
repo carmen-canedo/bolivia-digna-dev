@@ -52,49 +52,113 @@ function sha256(ascii){
 
   // use sha256.h if already exists || or use an empty array, same for sha256.k
   // arrays are cached, don't always need to be recalculated
+  // hash stores initial
   var hash=sha256.h=sha256.h||[], k=sha256.k=sha256.k||[], primeCounter=k[lengthProperty];
   
-  // 
   var isComposite={};
+
+  // Generate the first 64 prime numbers and store them in the k array
   for(var candidate=2;primeCounter<64;candidate++){
+
+    // Check if candidate is prime, i.e. not in isComposite
     if(!isComposite[candidate]){
+      // Mark all multiples of the prime as composite
       for(i=0;i<313;i+=candidate)isComposite[i]=candidate;
+      // Calculate the hash values for the first 8 primes and store them in the hash array
       hash[primeCounter]=(mathPow(candidate,.5)*maxWord)|0;
+      // Calculate the round constants for the first 64 primes and store them in the k array
       k[primeCounter++]=(mathPow(candidate,1/3)*maxWord)|0;
     }
   }
+
+  // Pad the input string with a single '1' bit followed by enough '0' bits to make the length congruent to 448 mod 512
   ascii+='\x80';
+
+  // Pad the input string with '0' bits until its length is congruent to 448 mod 512
   while(ascii[lengthProperty]%64-56)ascii+='\x00';
+
+  // Loop through every character in the padded input
   for(i=0;i<ascii[lengthProperty];i++){
+    // get numeric character code at position i
     j=ascii.charCodeAt(i);
+    // If the character uses more than 8 bits, exit without returning a hash
     if(j>>8)return;
+    // Pack 4 8-bit character codes into each 32-bit wor
+    // i >> 2 is equivalent to integer division by 4, Math.floor(i / 4), which gives the index of the 32-bit word
     words[i>>2]|=j<<((3-i)%4)*8;
   }
+
+  // Append to the original message length
   words[words[lengthProperty]]=((asciiBitLength/maxWord)|0);
   words[words[lengthProperty]]=(asciiBitLength);
+
+  // Process the message in groups of 16 words
+  // Each word is 32 bits, so 16 words = 512 bits, which is the block size for SHA-256
+  // j is increased by 16 inside slice() to get the next 16 words for the next block
   for(j=0;j<words[lengthProperty];){
+
+    // Copies the next 16 words into w and saves the current hash values in oldHash
     var w=words.slice(j,j+=16), oldHash=hash;
+    // Copies only the first 8 hash values
     hash=hash.slice(0,8);
+
+    // Perform all 64 rounds of SHA-256
     for(i=0;i<64;i++){
+
+      // Get the word located 15 positions earlier and 2 positions earlier in the w array
       var w15=w[i-15], w2=w[i-2];
+
+      // Store 1st working hash in a and 5th working hash in e
       var a=hash[0], e=hash[4];
+
+      // Calculate 1st temporary SHA-256 value
+      // temp1 combines the 8th working has, rotated versions of e, a conditional bitwise fn, the current constant k[i], and the current expanded message word w[i]
       var temp1=hash[7]
+
+        // SHA-256 big sigma 1 function applied to e
         +(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))
+        // SHA-256 "choose" fn
         +((e&hash[5])^((~e)&hash[6]))
+        // Add the current round constant
         +k[i]
+        //Determine the current message-schedule word
+        // if i < 16: use original word w[i]
+        // else: calculate a new word from earlier words and bit rotations
         +(w[i]=(i<16)?w[i]:(w[i-16]+(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))+w[i-7]+(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0);
-      var temp2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
-      hash=[(temp1+temp2)|0].concat(hash);
+      
+        // Calculate 2nd temporary SHA-256 value 
+        var temp2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+      
+        // Add the new 1st working value to the beginning of the hash array and add the new 5th working value to the end of the hash array
+        // concat(has) creates a new array: [newValue, oldHash0, oldHash1, ..., oldHash7]
+        // |0 forces the results into a signed 32 bit int
+        hash=[(temp1+temp2)|0].concat(hash);
+      // Update the 5th working hash position
       hash[4]=(hash[4]+temp1)|0;
     }
+
+    // Add the result of the 512-bit block back into the previous hash state
     for(i=0;i<8;i++)hash[i]=(hash[i]+oldHash[i])|0;
   }
+
+  // Convert the 8 32-bit hash vals into hexadecimal text and return the final SHA-256 hash as a string
   for(i=0;i<8;i++){
+
+    // Process each 32-bit value one byte at a time from highest to lowest
     for(j=3;j+1;j--){
+
+      // Shift selected byte into the lowest position and keep only the lowest 8 bits (0-255)
+      // &255 is equivalent to keeping a value between 0 and 
       var b=(hash[i]>>(j*8))&255;
+
+      // Convert the byte to a hexadecimal string
+      // If b<16, add a leading 0 to ensure two hex digits
+      // so 10 becomes 0a not a
       result+=((b<16)?0:'')+b.toString(16);
     }
+
   }
+  
   return result;
 }
 // SEGURIDAD (v6.1): contraseñas COMPARTIDAS. Todos los administradores comparten
