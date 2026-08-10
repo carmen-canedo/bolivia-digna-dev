@@ -39,10 +39,22 @@ function sha256(ascii){
   // << left shift
   function rightRotate(value, amount){return (value>>>amount)|(value<<(32-amount));}
 
-  // Declaration of 
-  var mathPow=Math.pow, maxWord=mathPow(2,32), lengthProperty='length', i, j, result='';
+  // Declaration of variables
+  // mathPow is a reference to the Math.pow function
+  // maxWord is 2^32, used for bitwise operations
+  // lengthProperty is a string 'length' used to access the length of arrays
+  // i and j are loop counters
+  // result starts as an empty string and will eventually hold the hexadecimal SHA256 has
+  var mathPow=Math.pow,maxWord=mathPow(2,32), lengthProperty='length', i, j, result='';
+  
+  // initialize an array of 8 32-bit words to hold the hash values
   var words=[], asciiBitLength=ascii[lengthProperty]*8;
+
+  // use sha256.h if already exists || or use an empty array, same for sha256.k
+  // arrays are cached, don't always need to be recalculated
   var hash=sha256.h=sha256.h||[], k=sha256.k=sha256.k||[], primeCounter=k[lengthProperty];
+  
+  // 
   var isComposite={};
   for(var candidate=2;primeCounter<64;candidate++){
     if(!isComposite[candidate]){
