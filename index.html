@@ -158,9 +158,10 @@ function sha256(ascii){
     }
 
   }
-  
+
   return result;
 }
+
 // SEGURIDAD (v6.1): contraseñas COMPARTIDAS. Todos los administradores comparten
 // una contraseña y todos los voluntarios comparten otra. Aquí solo se guarda la
 // huella SHA-256 de cada una (no la contraseña). Para la rotación semestral, basta
@@ -179,12 +180,20 @@ const PASS_SCHEDULE=[
   {desde:"2028-06-12",etiqueta:"Jun 2028 – Dic 2028",admin:"226846e9b142a8db6291729591c5e1c4e45251ad452784c034417ef3b96ce808",voluntario:"b764ad0c898832919b523b6cad26b9cdf9cd9b197f8a5507f9f2797ea0108bcd"},
   {desde:"2028-12-12",etiqueta:"Dic 2028 – Jun 2029",admin:"6891a6fbbe48f5d88b829db9a796aed3f161b63b55b5ae0c05cdd7e3c39186e4",voluntario:"b7b1fb1533af35a1b723f53b1ee64d800e26f79af7c16114404698eeb4a770b2"},
 ];
+
+// Selects the current period by today's date
 function periodoActual(){
+
   const hoy=new Date().toISOString().slice(0,10);
+
+  // Assumes first date is current
   let cur=PASS_SCHEDULE[0];
   for(let i=0;i<PASS_SCHEDULE.length;i++){ if(PASS_SCHEDULE[i].desde<=hoy) cur=PASS_SCHEDULE[i]; }
+
   return cur;
 }
+
+
 // SEGURIDAD (v7): a partir de esta versión, las contraseñas YA NO dependen de un
 // calendario fijo en el código. El administrador puede cambiarlas cuando lo
 // necesite desde el apartado "Contraseñas del Sistema" (solo visible para
@@ -193,6 +202,8 @@ function periodoActual(){
 // acceso de quienes ya tienen una contraseña entregada. Desde ahí en adelante,
 // los cambios se guardan en el estado de la app (y se sincronizan con Drive si
 // está configurado).
+
+// Pulls directly from v6 hashes above
 const INIT_PASS_ADMIN = periodoActual().admin;
 const INIT_PASS_VOLUNTARIO = periodoActual().voluntario;
 
