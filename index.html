@@ -204,26 +204,50 @@ function periodoActual(){
 // está configurado).
 
 // Pulls directly from v6 hashes above
+// Takes the specific property (admin or voluntario) from the current period and saves as the initial password hash
+// Executed immediately when the JS file loads
 const INIT_PASS_ADMIN = periodoActual().admin;
 const INIT_PASS_VOLUNTARIO = periodoActual().voluntario;
 
 // Directorio de cuentas administrativas (sin contraseñas).
 // Las cuentas de voluntarios (vol0001–vol9999) se generan dinámicamente en el login.
+// Keys on the left are accepted admin usernames
+// role controls authorization behavior
+// nombre is the human-readable name shown by the app
 const CRED={
   admin:{role:"admin",nombre:"Administración"},
   coordinacion:{role:"admin",nombre:"Coordinación"},
   direccion:{role:"admin",nombre:"Dirección"},
   voluntariado:{role:"admin",nombre:"Gestión de Voluntariado"},
 };
+
+
 // Resuelve una cuenta de voluntario dinámicamente si sigue el patrón volXXXX
+// Function to lookup or construct a credential record from CRED
 function resolverCred(key){
-  if(CRED[key]) return CRED[key];
+  
+  // Check that key exists in CRED, if so return the corresponding object
+  if(CRED[key])
+    return CRED[key];
+
   // Acepta vol001–vol999 (3 dígitos, legado) y vol0001–vol9999 (4 dígitos, nuevo)
+  // Issue with regex here: 0* means zero or more zero so it can be vol000000001 and be correct
   const m=key.match(/^vol0*(\d+)$/);
+
+  // Given regex match, convert digits into integer
   if(m){
+    // m[1] is (\d+), 10 is base 10
+    // parseInt("0023", 10) gives 23
     const num=parseInt(m[1],10);
-    if(num>=1&&num<=9999) return{role:"voluntario",nombre:`Voluntario/a ${String(num).padStart(4,"0")}`,volId:num};
+
+    // Creates a new credential object
+    if(num>=1&&num<=9999)
+      // role assigns authorization and nombre is the display name
+      // volID stores the number to connect with login identity to a volunteer record
+      return{role:"voluntario",nombre:`Voluntario/a ${String(num).padStart(4,"0")}`,volId:num};
   }
+
+  // null is returned if the username is not a key in CRED or accepted volunteer username
   return null;
 }
 // Apartados visibles para voluntarios (los administradores ven todo)
