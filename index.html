@@ -3034,8 +3034,17 @@ function App(){
   const [comunicados,setComunicados]=useState(INIT_COMUNICADOS);
   const [centros,setCentros]=useState(INIT_CENTROS);
   const [confirm,setConfirm]=useState(INIT_CONFIRM);
-  const [passAdmin,setPassAdmin]=useState(INIT_PASS_ADMIN);
-  const [passVoluntario,setPassVoluntario]=useState(INIT_PASS_VOLUNTARIO);
+
+  // ── Contraseñas para desarollo local ───────────────────────────────────────
+  const LOCAL_PASS_ADMIN = sha256("admin-local");
+  const LOCAL_PASS_VOLUNTARIO = sha256("voluntario-local");
+
+  const [passAdmin,setPassAdmin]=useState(
+    IS_LOCAL ? LOCAL_PASS_ADMIN : INIT_PASS_ADMIN);
+  const [passVoluntario,setPassVoluntario]=useState(
+    IS_LOCAL ? LOCAL_PASS_VOLUNTARIO : INIT_PASS_VOLUNTARIO);
+
+
   const [passMeta,setPassMeta]=useState({adminFecha:null,adminPor:null,volFecha:null,volPor:null});
 
   // ── Sincronización con Google Drive ────────────────────────────────────────
