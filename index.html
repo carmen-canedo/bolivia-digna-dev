@@ -553,6 +553,7 @@ const NAV_GROUPS=[
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
+// Defines the Login component, which handles user authentication and role selection
 const Login = ({ onLogin, passAdmin, passVoluntario }) => {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
@@ -562,8 +563,13 @@ const Login = ({ onLogin, passAdmin, passVoluntario }) => {
   const [showPass, setShowPass] = useState(false);
   const inputRef = useRef(null);
 
-  useEffect(() => { if (inputRef.current) inputRef.current.focus(); }, [modo]);
-
+  // Effect runs whenever modo changes, focusing the username input field
+  useEffect(() => { 
+    if (inputRef.current) 
+        inputRef.current.focus(); },
+      [modo]);
+  
+  // Handles form submission for login
   const handleSubmit = (e) => {
 
     // Stops browser's normal form submission behavior (normally HTML would reload the page)
@@ -1063,6 +1069,7 @@ const Voluntarios=({vols,setVols})=>{
     return mF&&mT&&mS;
   });
 
+  // Volunteer management forms
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:12}}>
