@@ -3,6 +3,9 @@
 outlines/
 reference-pres/
 
+# Real migration data
+migration-data/*.json
+
 # Environment variables
 .env
 .env.local
