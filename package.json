@@ -1,6 +1,6 @@
 {
-  "name": "bolivia-digna-dev",
-  "version": "1.0.0",
+  "name": "bolivia-digna",
+  "version": "2.0.0-dev",
   "description": "Sistema de gestión de fundación Bolivia Digna",
   "main": "index.js",
   "scripts": {
