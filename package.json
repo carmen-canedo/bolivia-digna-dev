@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/carmen-canedo/bolivia-digna-dev/issues"
   },
-  "homepage": "https://github.com/carmen-canedo/bolivia-digna-dev#readme"
+  "homepage": "https://github.com/carmen-canedo/bolivia-digna-dev#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3"
+  }
 }
