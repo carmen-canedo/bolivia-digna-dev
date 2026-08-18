@@ -8,3 +8,8 @@ reference-pres/
 .env.local
 .env.*.local
 
+# Node dependencies
+node_modules/
+
+# Build output
+dist/
