@@ -24,24 +24,37 @@ CREATE TABLE public.centros (
 );
 
 CREATE TABLE public.vols (
-    id UUID PRIMARY KEY REFERENCES public.perfiles(id) DELETE ON CASCADE,
+    id UUID PRIMARY KEY REFERENCES public.perfiles(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     fecha_nacimiento DATE NOT NULL,
-    -- i think this can actually be null bc someone can have a phone but not an email and vice versa, but one needs to be required
     telefono VARCHAR,
-    correo VARCHAR UNIQUE,
+    correo VARCHAR,
     area VARCHAR NOT NULL CHECK (area IN ('educacion', 'comunicacion')),
-    rol VARCHAR NOT NULL CHECK (rol IN ('apoyo', 'lider', 'responsable'))
+    rol VARCHAR NOT NULL CHECK (rol IN ('apoyo', 'lider', 'responsable')),
     tipo_voluntario VARCHAR NOT NULL CHECK (tipo_voluntario IN ('nacional', 'internacional')),
     pais_origen VARCHAR NOT NULL,
     area_estudio TEXT,
     activo BOOLEAN NOT NULL,
     horas_semana INT NOT NULL CHECK (horas_semana >= 0 AND horas_semana <= 40),
-    faltas INT CHECK (faltas >=0 AND faltas <= 3)
-    centro_preferido_id INT REFERENCES public.centros(id),
+    faltas INT CHECK (faltas >=0 AND faltas <= 3),
+    centro_preferido_id INT REFERENCES public.centros(id) ON DELETE SET NULL,
     comentarios TEXT,
 
-    CHECK ((telefono IS NULL AND correo IS NOT NULL)
-            OR
-            (telefono IS NOT NULL AND correo IS NULL))
+    -- A volunteer must provide either phone number or email
+    CHECK (telefono IS NOT NULL
+        OR correo IS NOT NULL),
+    
+    -- Phone numbers can't be blank and must include country code and have valid formatting
+    CHECK ((telefono IS NULL)
+        OR (NULLIF(TRIM(telefono), '') IS NOT NULL
+        AND telefono ~ '^\+[1-9][0-9]{7,14}$')),
+
+    -- Emails must have proper formatting and can't be blank
+    CHECK (correo IS NULL
+        OR (NULLIF(TRIM(correo), '') IS NOT NULL
+        AND correo ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'))
 );
+
+-- Enforce unique emails, make case insensitive
+CREATE UNIQUE INDEX vols_correo_unique_ci
+ON public.vols (LOWER(correo));
