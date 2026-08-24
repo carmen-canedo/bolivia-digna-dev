@@ -136,7 +136,7 @@ Table disponibilidad_voluntario {
 }
 
 // one volunteer can have many dia/bloque availability combinations
-Ref: disponibilidad_voluntario.vol_id > vols.id
+Ref: disponibilidad_voluntario.vol_id > vols.id [delete: cascade]
 
 // one record represents a volunteer's confirmed availability for a specific week by day and time block
 Table confirmacion_semanal {
@@ -175,10 +175,10 @@ Table confirmacion_dia {
   }
 }
 
-Ref: confirmacion_semanal.vol_id > vols.id
+Ref: confirmacion_semanal.vol_id > vols.id [delete: cascade]
 // optional relationship because centro_id can start as NULL
-Ref: confirmacion_semanal.centro_id >? centros.id
-Ref: confirmacion_dia.confirmacion_id > confirmacion_semanal.id
+Ref: confirmacion_semanal.centro_id >? centros.id [delete: set null]
+Ref: confirmacion_dia.confirmacion_id > confirmacion_semanal.id [delete: cascade]
 
 // Comunicados
 Table comunicados {
