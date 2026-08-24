@@ -95,11 +95,20 @@ Table servicios_centro {
   centro_id int [not null]
   nombre varchar [not null]
   turno varchar [not null, check: `turno IN ('manana', 'mediodia', 'tarde')`]
-  dias varchar [not null]
   horario varchar [not null]
 }
 
-Ref: servicios_centro.centro_id > centros.id
+Table servicios_centro_dias {
+  servicio_id int [not null]
+  dia varchar [not null, check: `dia IN ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')`]
+
+  indexes {
+    (servicio_id, dia) [pk]
+  }
+}
+
+Ref: servicios_centro.centro_id > centros.id [delete: cascade]
+Ref: servicios_centro_dias.servicio_id > servicios_centro.id [delete: cascade]
 
 // indicates volunteers centro preferences. it is a many-to-many relationship
 Table voluntario_centro {
