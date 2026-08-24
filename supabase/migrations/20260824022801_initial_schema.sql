@@ -18,7 +18,30 @@ CREATE TABLE public.centros (
     nombre VARCHAR UNIQUE NOT NULL,
     img VARCHAR,
     estado VARCHAR NOT NULL CHECK (estado IN ('activo', 'inactivo')),
-    responsable_id UUID NOT NULL REFERENCES public.perfiles(id),
+    responsable_id UUID REFERENCES public.perfiles(id) ON DELETE SET NULL,
     mapa_url VARCHAR,
     descripcion TEXT
+);
+
+CREATE TABLE public.vols (
+    id UUID PRIMARY KEY REFERENCES public.perfiles(id) DELETE ON CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_nacimiento DATE NOT NULL,
+    -- i think this can actually be null bc someone can have a phone but not an email and vice versa, but one needs to be required
+    telefono VARCHAR,
+    correo VARCHAR UNIQUE,
+    area VARCHAR NOT NULL CHECK (area IN ('educacion', 'comunicacion')),
+    rol VARCHAR NOT NULL CHECK (rol IN ('apoyo', 'lider', 'responsable'))
+    tipo_voluntario VARCHAR NOT NULL CHECK (tipo_voluntario IN ('nacional', 'internacional')),
+    pais_origen VARCHAR NOT NULL,
+    area_estudio TEXT,
+    activo BOOLEAN NOT NULL,
+    horas_semana INT NOT NULL CHECK (horas_semana >= 0 AND horas_semana <= 40),
+    faltas INT CHECK (faltas >=0 AND faltas <= 3)
+    centro_preferido_id INT REFERENCES public.centros(id),
+    comentarios TEXT,
+
+    CHECK ((telefono IS NULL AND correo IS NOT NULL)
+            OR
+            (telefono IS NOT NULL AND correo IS NULL))
 );
