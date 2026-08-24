@@ -11,18 +11,35 @@ Table perfiles {
   rol_app varchar [not null, check: `rol_app IN ('admin', 'voluntario')`]
   rol_sistema varchar [null, check: `rol_sistema IN ('administracion', 'coordinacion', 'direccion', 'gestion_voluntariado')`]
   activo boolean [not null]
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
 }
+
+Table centros {
+  id int [primary key, increment]
+  // don't need to do check for location 1 etc because maybe this can increase or decrease if projects are dropped/aded
+  nombre varchar [unique, not null]
+  img varchar [null]
+  estado varchar [not null, check: `estado IN ('activo', 'inactivo')`]
+  // someone is always responsible for a location, but the individual may change
+  responsable_id uuid [null]
+  // this should be required because it is informative for all volunteers
+  // however i don't know if there will always be a location pin availabile, so will allow null for now
+  mapa_url varchar [null]
+  descripcion text [null]
+  // separate table for servicios and adjuntos
+}
+
+Ref: centros.responsable_id > perfiles.id [delete: set null]
 
 // volunteer-specific operational information
 Table vols {
   id uuid [primary key]
   // added here to help with tracking
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
   fecha_nacimiento date [not null]
   // ui will need to reflect required country code. currently has suggested 7XXXXXXX
-  telefono varchar [not null]
-  correo varchar [unique, not null]
+  telefono varchar [null]
+  correo varchar [null]
   area varchar [not null, check: `area IN ('educacion', 'comunicacion')`]
   rol varchar [not null, check: `rol IN ('apoyo', 'lider', 'responsable')`]
   // tipo varchar
@@ -57,7 +74,7 @@ Ref: vols.centro_preferido_id >? centros.id
 
 // Temporary table to assist in migrating legacy id's to new set up
 Table migration_voluntarios {
-  legacy_vol_id int [not null]
+  legacy_vol_id varchar [not null]
   legacy_vol_usuario varchar [not null]
   new_uuid uuid [not null]
 
@@ -70,26 +87,9 @@ Table migration_voluntarios {
 
 Ref: migration_voluntarios.new_uuid - perfiles.id
 
-Table centros {
-  id int [primary key]
-  // don't need to do check for location 1 etc because maybe this can increase or decrease if projects are dropped/aded
-  nombre varchar [unique, not null]
-  img varchar [null]
-  estado varchar [not null, check: `estado IN ('activo', 'inactivo')`]
-  // someone is always responsible for a location, but the individual may change
-  responsable_id uuid [not null]
-  // this should be required because it is informative for all volunteers
-  // however i don't know if there will always be a location pin availabile, so will allow null for now
-  mapa_url varchar [null]
-  descripcion text [null]
-  // separate table for servicios and adjuntos
-}
-
-Ref: centros.responsable_id > perfiles.id
-
 Table servicios_centro {
   // record-specific
-  id int [primary key]
+  id int [primary key, increment]
   // which center does this service belong to
   centro_id int [not null]
   nombre varchar [not null]
@@ -130,7 +130,7 @@ Ref: disponibilidad_voluntario.vol_id > vols.id
 
 // one record represents a volunteer's confirmed availability for a specific week by day and time block
 Table confirmacion_semanal {
-  id int [primary key]
+  id int [primary key, increment]
   vol_id uuid [not null]
   // can be null at first because volunteer may confrim availability before a center is assigned by admin
   centro_id int [null]
@@ -140,7 +140,7 @@ Table confirmacion_semanal {
   observaciones text [null]
   // admin validates weekly attendance record
   validado boolean [not null]
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
 
   indexes {
     // prevent repeat week/bloque records for same volunteer
@@ -150,7 +150,7 @@ Table confirmacion_semanal {
 
 // stores the status of each day selected within a weekly confirmation
 Table confirmacion_dia {
-  id int [primary key]
+  id int [primary key, increment]
   confirmacion_id int [not null]
   dia varchar [not null, check: `dia IN ('lunes', 'martes', 'miercoles', 'jueves', 
                                 'viernes', 'sabado', 'domingo')`]
@@ -172,8 +172,8 @@ Ref: confirmacion_dia.confirmacion_id > confirmacion_semanal.id
 
 // Comunicados
 Table comunicados {
-  id int [primary key]
-  created_at timestamp
+  id int [primary key, increment]
+  created_at timestamptz [not null, default: `now()`]
   fecha date [not null]
   titulo text [not null]
   contenido text [not null]
@@ -211,7 +211,7 @@ Ref: comunicado_canales.comunicado_id > comunicados.id
 
 // Activities
 Table actividades {
-  id int [primary key]
+  id int [primary key, increment]
   // one day can have more than one activity
   fecha date [not null]
   actividad text [not null]
@@ -270,23 +270,23 @@ Ref: actividades_materiales.actividad_id > actividades.id
 
 // Tareas
 Table tareas {
-  id int [primary key]
+  id int [primary key, increment]
   semana_inicio date [not null]
   texto text [not null]
   completado boolean [not null]
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
 }
 
 // Required policy documents shown in the Política de Protección section
 Table documentos_politica {
-  id int [primary key]
+  id int [primary key, increment]
   titulo varchar [not null]
   // e.g. "Documento marco · 2026", "Compromisos del voluntariado · 2026",
   // "Versión julio 2026"
   version varchar [null]
   // link/path to the actual document
   url varchar [not null]
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
 }
 
 
@@ -294,7 +294,7 @@ Table documentos_politica {
 // not each document individually
 Table aceptaciones_politica {
   vol_id uuid [primary key]
-  aceptado_at timestamp [not null]
+  aceptado_at timestamptz [not null]
 }
 
 Ref: aceptaciones_politica.vol_id - vols.id
@@ -303,20 +303,20 @@ Ref: aceptaciones_politica.vol_id - vols.id
 // additional documents uploaded by administration
 // corresponds to the "Documentos adjuntos" section
 Table documentos_adjuntos {
-  id int [primary key]
+  id int [primary key, increment]
   titulo varchar [not null]
   url varchar [not null]
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
 }
 
 // Direct messaging between admin and volunteer
 // this is different than comunicados because it is a private conversation between one selected admin and one volunteer
 Table conversaciones {
-  id int [primary key]
+  id int [primary key, increment]
   voluntario_id uuid [not null]
   // selected admin (direccion, coordinacion, etc)
   responsable_id uuid [not null]
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
 
   indexes {
     // prevent multiple conversations between same individuals
@@ -329,18 +329,18 @@ Ref: conversaciones.responsable_id > perfiles.id
 
 // Each row is a message within a conversation
 Table mensajes {
-  id int [primary key]
+  id int [primary key, increment]
   conversacion_id int [not null]
   sender_id uuid [not null]
   contenido text [not null]
-  created_at timestamp
+  created_at timestamptz [not null, default: `now()`]
   // null means unread
-  leido_at timestamp [null]
+  leido_at timestamptz [null]
   // calls back to previous message
   reply_to_id int [null]
-  unsent_at timestamp [null]
+  unsent_at timestamptz [null]
   // null meaning unedited
-  edited_at timestamp [null]
+  edited_at timestamptz [null]
 
 }
 
@@ -350,12 +350,12 @@ Ref: mensajes.reply_to_id >? mensajes.id
 
 // for reporting inappropirate messages
 Table mensajes_reportes {
-  id int [primary key]
+  id int [primary key, increment]
   mensaje_id int [not null]
   reportado_por uuid [not null]
   motivo varchar [not null, check: `motivo IN ('inapropiado', 'acoso', 'spam', 'otro')`]
   descripcion text [null]
-  created_at timestamp 
+  created_at timestamptz [not null, default: `now()`]
 
   indexes {
     // prevent same person from reporting the same message multiple times
@@ -368,14 +368,14 @@ Ref: mensajes_reportes.reportado_por > perfiles.id
 
 // system-generated notifications for authenticated users
 Table notificaciones {
-  id int [primary key]
+  id int [primary key, increment]
   user_id uuid [not null]
   tipo varchar [not null, check: `tipo IN ('centro_asignado', 'horario_modificado','confirmacion_validada',
                                           'asistencia_actualizada', 'nuevo_comunicado','nuevo_mensaje', 'registro_completado')`]
   titulo varchar [not null]
   mensaje text [not null]
-  created_at timestamp
-  leido_at timestamp [null]
+  created_at timestamptz [not null, default: `now()`]
+  leido_at timestamptz [null]
   // exactly one target foreign key must be populated per notification
   // will enforce with PostgreSQL CHECK in SQL migration
   confirmacion_semanal_id int [null]
