@@ -74,6 +74,7 @@ Ref: vols.centro_preferido_id >? centros.id
 
 // Temporary table to assist in migrating legacy id's to new set up
 Table migration_voluntarios {
+  // potentially revisit pk for this one
   legacy_vol_id varchar [not null]
   legacy_vol_usuario varchar [not null]
   new_uuid uuid [not null]
