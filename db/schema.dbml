@@ -1,0 +1,397 @@
+// user authorization
+Table perfiles {
+  id uuid [primary key]
+  // i would like usernames to be informative firstname lastname combo
+  username varchar [unique, not null]
+  // splitting nombre into first name and last name
+  nombre varchar [not null]
+  apellido varchar [not null]
+  // optional because not all international vols have 2 last names
+  segundo_apellido varchar [null]
+  rol_app varchar [not null, check: `rol_app IN ('admin', 'voluntario')`]
+  rol_sistema varchar [null, check: `rol_sistema IN ('administracion', 'coordinacion', 'direccion', 'gestion_voluntariado')`]
+  activo boolean [not null]
+  created_at timestamp
+}
+
+// volunteer-specific operational information
+Table vols {
+  id uuid [primary key]
+  // added here to help with tracking
+  created_at timestamp
+  fecha_nacimiento date [not null]
+  // ui will need to reflect required country code. currently has suggested 7XXXXXXX
+  telefono varchar [not null]
+  correo varchar [unique, not null]
+  area varchar [not null, check: `area IN ('educacion', 'comunicacion')`]
+  rol varchar [not null, check: `rol IN ('apoyo', 'lider', 'responsable')`]
+  // tipo varchar
+  // rename tipo to make it more clear this is used to determine national/international
+  tipo_voluntario varchar [not null, check: `tipo_voluntario IN ('nacional', 'internacional')`]
+  // specific country name goes here
+  pais_origen varchar [not null]
+  area_estudio text [null]
+  // disponibilidad and bloques need separate tables
+  // if the volunteer is active, this cannot be null. if they are inactive null is fine
+  // disponibilidad varchar[] [not null,
+  //                           check: `disponibilidad IN ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')`]
+  // bloques varchar[] [not null, check: `bloques IN ('manana: 9-12', 'medio día: 11-14', 'tarde: 14:30-17:30')`]
+  activo boolean [not null]
+  // manually entered and can be edited later
+  horas_semana int [not null, check: `horas_semana >= 0 AND horas_semana <= 40`]
+  // horasAcumuladas calculated through confirmacion semanal or other table
+  // horasAcumuladas int [not null]
+  // maximum 3 absences
+  faltas int [null, check: `faltas >=0 AND faltas <= 3`]
+  // volunteer lists the projects they are willing/able to work
+  // better for ubicaciones to have its own table because this can change over time and is 1:many relationship
+  // maybe can be null because a new volunteer may not know which to select
+  // ubicaciones varchar[] [null, check: `ubicaciones IN ('location 1', 'location 2', 'location 3', 'location 4', 'location 5', 'location 6', 'location 7', 'location 8', 'otro')`]
+  // new volunteers could have an option like "in rotation" or "undecided" while they explore project options
+  centro_preferido_id int
+  comentarios text [null]
+}
+
+Ref: vols.id - perfiles.id
+Ref: vols.centro_preferido_id >? centros.id
+
+// Temporary table to assist in migrating legacy id's to new set up
+Table migration_voluntarios {
+  legacy_vol_id int [not null]
+  legacy_vol_usuario varchar [not null]
+  new_uuid uuid [not null]
+
+  indexes {
+    (legacy_vol_id) [unique]
+    (legacy_vol_usuario) [unique]
+    (new_uuid) [unique]
+  }
+}
+
+Ref: migration_voluntarios.new_uuid - perfiles.id
+
+Table centros {
+  id int [primary key]
+  // don't need to do check for location 1 etc because maybe this can increase or decrease if projects are dropped/aded
+  nombre varchar [unique, not null]
+  img varchar [null]
+  estado varchar [not null, check: `estado IN ('activo', 'inactivo')`]
+  // someone is always responsible for a location, but the individual may change
+  responsable_id uuid [not null]
+  // this should be required because it is informative for all volunteers
+  // however i don't know if there will always be a location pin availabile, so will allow null for now
+  mapa_url varchar [null]
+  descripcion text [null]
+  // separate table for servicios and adjuntos
+}
+
+Ref: centros.responsable_id > perfiles.id
+
+Table servicios_centro {
+  // record-specific
+  id int [primary key]
+  // which center does this service belong to
+  centro_id int [not null]
+  nombre varchar [not null]
+  turno varchar [not null, check: `turno IN ('manana', 'mediodia', 'tarde')`]
+  dias varchar [not null]
+  horario varchar [not null]
+}
+
+Ref: servicios_centro.centro_id > centros.id
+
+// indicates volunteers centro preferences. it is a many-to-many relationship
+Table voluntario_centro {
+  vol_id uuid [not null]
+  centro_id int [not null]
+
+  indexes {
+    (vol_id, centro_id) [pk]
+  }
+}
+
+// one volunteer can select multiple centros; one centro can have many volunteers
+Ref: voluntario_centro.vol_id > vols.id
+Ref: voluntario_centro.centro_id > centros.id
+
+// availability and scheduling
+Table disponibilidad_voluntario {
+  vol_id uuid [not null]
+  dia varchar [not null, check: `dia IN ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')`]
+  bloque varchar [not null, check: `bloque IN ('manana', 'mediodia', 'tarde')`]
+
+  indexes {
+    (vol_id, dia, bloque) [pk]
+  }
+}
+
+// one volunteer can have many dia/bloque availability combinations
+Ref: disponibilidad_voluntario.vol_id > vols.id
+
+// one record represents a volunteer's confirmed availability for a specific week by day and time block
+Table confirmacion_semanal {
+  id int [primary key]
+  vol_id uuid [not null]
+  // can be null at first because volunteer may confrim availability before a center is assigned by admin
+  centro_id int [null]
+  // monday or first day of relevant week
+  semana_inicio date [not null]
+  bloque varchar [not null, check: `bloque IN ('manana', 'mediodia', 'tarde')`]
+  observaciones text [null]
+  // admin validates weekly attendance record
+  validado boolean [not null]
+  created_at timestamp
+
+  indexes {
+    // prevent repeat week/bloque records for same volunteer
+    (vol_id, semana_inicio, bloque) [unique]
+  }
+}
+
+// stores the status of each day selected within a weekly confirmation
+Table confirmacion_dia {
+  id int [primary key]
+  confirmacion_id int [not null]
+  dia varchar [not null, check: `dia IN ('lunes', 'martes', 'miercoles', 'jueves', 
+                                'viernes', 'sabado', 'domingo')`]
+  // confirmado: volunteer confirmed availability
+  // asistio: admin approves that volunteer attended
+  // falta: admin denies that volunteer attended
+  estado varchar [not null, check: `estado IN ('confirmado', 'asistio', 'falta')`]
+
+  indexes {
+    // prevents the same day being duplicated within same week
+    (confirmacion_id, dia) [unique]
+  }
+}
+
+Ref: confirmacion_semanal.vol_id > vols.id
+// optional relationship because centro_id can start as NULL
+Ref: confirmacion_semanal.centro_id >? centros.id
+Ref: confirmacion_dia.confirmacion_id > confirmacion_semanal.id
+
+// Comunicados
+Table comunicados {
+  id int [primary key]
+  created_at timestamp
+  fecha date [not null]
+  titulo text [not null]
+  contenido text [not null]
+  tipo varchar [not null, check: `tipo IN ('general', 'urgente', 'evento', 'logro')`]
+  autor varchar [not null]
+  // how should por grupo/centro be handled? tie back to centros table? is this what they wanted to use the grupo column for?
+  destinatario varchar [not null, check: `destinatario IN ('todos', 'activos', 'inactivos', 'internacional', 'centro')`]
+  // handle canales separately because it can also be BOTH correo and whatsapp
+  //canales varchar [not null, check: `canales IN ('correo', 'whatsapp')`]
+}
+
+// Junction table to connect centros and comunicados
+Table comunicados_centro {
+  comunicado_id int [not null]
+  centro_id int [not null]
+
+  indexes {
+    (comunicado_id, centro_id) [pk]
+  }
+} 
+
+Ref: comunicados_centro.comunicado_id > comunicados.id
+Ref: comunicados_centro.centro_id > centros.id
+
+Table comunicado_canales {
+  comunicado_id int [not null]
+  canal varchar [not null, check: `canal IN ('correo', 'whatsapp')`]
+
+  indexes {
+    (comunicado_id, canal) [pk]
+  }
+}
+
+Ref: comunicado_canales.comunicado_id > comunicados.id
+
+// Activities
+Table actividades {
+  id int [primary key]
+  // one day can have more than one activity
+  fecha date [not null]
+  actividad text [not null]
+  // each location has two divisions by age group: pequeno and mediano
+  // usually activities are separate, but some can be performed all together
+  grupo_edad varchar [check: `grupo_edad IN ('pequeno', 'mediano', 'todo')`]
+  // lugar tied to centro_id, probably should handle separately because it is common for 
+  // two of the centers to be doing the same activities
+  // voluntarios handled separately
+  estado varchar [not null, check: `estado IN ('pendiente', 'en_proceso', 'completado')`]
+  observaciones text [null]
+  tipo varchar [check: `tipo IN ('social', 'reunion', 'limpieza', 'construccion', 
+                        'mantenimiento', 'huerto', 'jardineria', 'primeros_auxilios', 
+                        'fraternizacion', 'nutricion')`]
+}
+
+// Junction tables for activities
+Table actividades_centros {
+  actividad_id int [not null]
+  centro_id int [not null]
+
+  indexes {
+    (actividad_id, centro_id) [pk]
+  }
+}
+
+Ref: actividades_centros.actividad_id > actividades.id
+Ref: actividades_centros.centro_id > centros.id
+
+
+Table actividades_voluntarios {
+  actividad_id int [not null]
+  vol_id uuid [not null]
+  rol varchar [not null, check: `rol IN ('lider', 'apoyo', 'auxiliar', 
+                                'educador', 'responsable')`]
+
+  indexes {
+    (actividad_id, vol_id) [pk]
+  }
+}
+
+Ref: actividades_voluntarios.actividad_id > actividades.id
+Ref: actividades_voluntarios.vol_id > vols.id
+
+Table actividades_materiales {
+  actividad_id int [not null]
+  material varchar [not null]
+  conseguido boolean [not null]
+
+  indexes {
+    (actividad_id, material) [pk]
+  }
+}
+
+Ref: actividades_materiales.actividad_id > actividades.id
+
+// Tareas
+Table tareas {
+  id int [primary key]
+  semana_inicio date [not null]
+  texto text [not null]
+  completado boolean [not null]
+  created_at timestamp
+}
+
+// Required policy documents shown in the Política de Protección section
+Table documentos_politica {
+  id int [primary key]
+  titulo varchar [not null]
+  // e.g. "Documento marco · 2026", "Compromisos del voluntariado · 2026",
+  // "Versión julio 2026"
+  version varchar [null]
+  // link/path to the actual document
+  url varchar [not null]
+  created_at timestamp
+}
+
+
+// volunteer accepts the complete required policy bundle,
+// not each document individually
+Table aceptaciones_politica {
+  vol_id uuid [primary key]
+  aceptado_at timestamp [not null]
+}
+
+Ref: aceptaciones_politica.vol_id - vols.id
+
+
+// additional documents uploaded by administration
+// corresponds to the "Documentos adjuntos" section
+Table documentos_adjuntos {
+  id int [primary key]
+  titulo varchar [not null]
+  url varchar [not null]
+  created_at timestamp
+}
+
+// Direct messaging between admin and volunteer
+// this is different than comunicados because it is a private conversation between one selected admin and one volunteer
+Table conversaciones {
+  id int [primary key]
+  voluntario_id uuid [not null]
+  // selected admin (direccion, coordinacion, etc)
+  responsable_id uuid [not null]
+  created_at timestamp
+
+  indexes {
+    // prevent multiple conversations between same individuals
+    (voluntario_id, responsable_id) [unique]
+  }
+}
+
+Ref: conversaciones.voluntario_id > perfiles.id
+Ref: conversaciones.responsable_id > perfiles.id
+
+// Each row is a message within a conversation
+Table mensajes {
+  id int [primary key]
+  conversacion_id int [not null]
+  sender_id uuid [not null]
+  contenido text [not null]
+  created_at timestamp
+  // null means unread
+  leido_at timestamp [null]
+  // calls back to previous message
+  reply_to_id int [null]
+  unsent_at timestamp [null]
+  // null meaning unedited
+  edited_at timestamp [null]
+
+}
+
+Ref: mensajes.conversacion_id > conversaciones.id
+Ref: mensajes.sender_id > perfiles.id
+Ref: mensajes.reply_to_id >? mensajes.id
+
+// for reporting inappropirate messages
+Table mensajes_reportes {
+  id int [primary key]
+  mensaje_id int [not null]
+  reportado_por uuid [not null]
+  motivo varchar [not null, check: `motivo IN ('inapropiado', 'acoso', 'spam', 'otro')`]
+  descripcion text [null]
+  created_at timestamp 
+
+  indexes {
+    // prevent same person from reporting the same message multiple times
+    (mensaje_id, reportado_por) [unique]
+  }
+}
+
+Ref: mensajes_reportes.mensaje_id > mensajes.id
+Ref: mensajes_reportes.reportado_por > perfiles.id
+
+// system-generated notifications for authenticated users
+Table notificaciones {
+  id int [primary key]
+  user_id uuid [not null]
+  tipo varchar [not null, check: `tipo IN ('centro_asignado', 'horario_modificado','confirmacion_validada',
+                                          'asistencia_actualizada', 'nuevo_comunicado','nuevo_mensaje', 'registro_completado')`]
+  titulo varchar [not null]
+  mensaje text [not null]
+  created_at timestamp
+  leido_at timestamp [null]
+  // exactly one target foreign key must be populated per notification
+  // will enforce with PostgreSQL CHECK in SQL migration
+  confirmacion_semanal_id int [null]
+  confirmacion_dia_id int [null]
+  comunicado_id int [null]
+  conversacion_id int [null]
+  perfil_id uuid [null]
+}
+
+Ref: notificaciones.user_id > perfiles.id
+Ref: notificaciones.confirmacion_semanal_id >? confirmacion_semanal.id
+Ref: notificaciones.confirmacion_dia_id >? confirmacion_dia.id
+Ref: notificaciones.comunicado_id >? comunicados.id
+Ref: notificaciones.conversacion_id >? conversaciones.id
+Ref: notificaciones.perfil_id >? perfiles.id
+
+
+
+
