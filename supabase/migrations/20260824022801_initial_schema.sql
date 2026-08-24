@@ -81,3 +81,9 @@ CREATE TABLE public.servicios_centro_dias (
     dia VARCHAR NOT NULL CHECK (dia IN ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')),
     PRIMARY KEY (servicio_id, dia)
 );
+
+CREATE TABLE public.voluntario_centro (
+    vol_id UUID NOT NULL REFERENCES public.vols(id) ON DELETE CASCADE,
+    centro_id INT NOT NULL REFERENCES public.centros(id) ON DELETE CASCADE,
+    PRIMARY KEY (vol_id, centro_id)
+);
