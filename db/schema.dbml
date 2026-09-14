@@ -205,8 +205,8 @@ Table comunicados_centro {
   }
 } 
 
-Ref: comunicados_centro.comunicado_id > comunicados.id
-Ref: comunicados_centro.centro_id > centros.id
+Ref: comunicados_centro.comunicado_id > comunicados.id [delete: cascade]
+Ref: comunicados_centro.centro_id > centros.id [delete: cascade]
 
 Table comunicado_canales {
   comunicado_id int [not null]
@@ -217,7 +217,7 @@ Table comunicado_canales {
   }
 }
 
-Ref: comunicado_canales.comunicado_id > comunicados.id
+Ref: comunicado_canales.comunicado_id > comunicados.id [delete: cascade]
 
 // Activities
 Table actividades {
@@ -248,8 +248,8 @@ Table actividades_centros {
   }
 }
 
-Ref: actividades_centros.actividad_id > actividades.id
-Ref: actividades_centros.centro_id > centros.id
+Ref: actividades_centros.actividad_id > actividades.id [delete: cascade]
+Ref: actividades_centros.centro_id > centros.id [delete: cascade]
 
 
 Table actividades_voluntarios {
@@ -263,8 +263,8 @@ Table actividades_voluntarios {
   }
 }
 
-Ref: actividades_voluntarios.actividad_id > actividades.id
-Ref: actividades_voluntarios.vol_id > vols.id
+Ref: actividades_voluntarios.actividad_id > actividades.id [delete: cascade]
+Ref: actividades_voluntarios.vol_id > vols.id [delete: cascade]
 
 Table actividades_materiales {
   actividad_id int [not null]
@@ -276,7 +276,7 @@ Table actividades_materiales {
   }
 }
 
-Ref: actividades_materiales.actividad_id > actividades.id
+Ref: actividades_materiales.actividad_id > actividades.id [delete: cascade]
 
 // Tareas
 Table tareas {
@@ -303,11 +303,16 @@ Table documentos_politica {
 // volunteer accepts the complete required policy bundle,
 // not each document individually
 Table aceptaciones_politica {
-  vol_id uuid [primary key]
+  vol_id uuid [not null]
+  documento_politica_id int [not null]
   aceptado_at timestamptz [not null]
+
+  indexes {
+    (vol_id, documento_politica_id) [pk]
+  }
 }
 
-Ref: aceptaciones_politica.vol_id - vols.id
+Ref: aceptaciones_politica.vol_id - vols.id  [delete: cascade]
 
 
 // additional documents uploaded by administration
@@ -323,18 +328,18 @@ Table documentos_adjuntos {
 // this is different than comunicados because it is a private conversation between one selected admin and one volunteer
 Table conversaciones {
   id int [primary key, increment]
-  voluntario_id uuid [not null]
+  vol_id uuid [not null]
   // selected admin (direccion, coordinacion, etc)
   responsable_id uuid [not null]
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
     // prevent multiple conversations between same individuals
-    (voluntario_id, responsable_id) [unique]
+    (vol_id, responsable_id) [unique]
   }
 }
 
-Ref: conversaciones.voluntario_id > perfiles.id
+Ref: conversaciones.vol_id > perfiles.id
 Ref: conversaciones.responsable_id > perfiles.id
 
 // Each row is a message within a conversation
@@ -354,7 +359,7 @@ Table mensajes {
 
 }
 
-Ref: mensajes.conversacion_id > conversaciones.id
+Ref: mensajes.conversacion_id > conversaciones.id [delete: cascade]
 Ref: mensajes.sender_id > perfiles.id
 Ref: mensajes.reply_to_id >? mensajes.id
 
@@ -373,7 +378,7 @@ Table mensajes_reportes {
   }
 }
 
-Ref: mensajes_reportes.mensaje_id > mensajes.id
+Ref: mensajes_reportes.mensaje_id > mensajes.id [delete: cascade]
 Ref: mensajes_reportes.reportado_por > perfiles.id
 
 // system-generated notifications for authenticated users
