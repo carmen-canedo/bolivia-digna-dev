@@ -196,7 +196,7 @@ CREATE TABLE public.documentos_politica (
 
 CREATE TABLE public.aceptaciones_politica (
     vol_id UUID NOT NULL REFERENCES public.vols(id) ON DELETE CASCADE,
-    documento_politica_id INT NOT NULL REFERENCES public.documentos_politica(id)
+    documento_politica_id INT NOT NULL REFERENCES public.documentos_politica(id),
     aceptado_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (vol_id, documento_politica_id)
 );
