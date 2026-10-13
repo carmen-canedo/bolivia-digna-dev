@@ -6,10 +6,13 @@ reference-pres/
 
 # Real migration data
 migration-data/
-scripts/
 
 # Environment variables
+bolivia-digna-env/
+.venv
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
@@ -18,3 +21,10 @@ node_modules/
 
 # Build output
 dist/
+
+# macOS files
+.DS_Store
+
+# Supabase local files
+supabase/.temp/
+supabase/.branches/
