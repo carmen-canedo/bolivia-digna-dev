@@ -6,6 +6,7 @@ reference-pres/
 
 # Real migration data
 migration-data/
+scripts/
 
 # Environment variables
 .env
