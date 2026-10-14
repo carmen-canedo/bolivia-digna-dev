@@ -28,3 +28,4 @@ dist/
 # Supabase local files
 supabase/.temp/
 supabase/.branches/
+.Rproj.user

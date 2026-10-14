@@ -1,0 +1,47 @@
+---
+title: "Legacy Data Transformation"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(jsonlite)
+```
+
+# Initial Data
+
+```{r}
+old_data <- fromJSON("migration-data/migration-data.json")
+
+# bd_data <- old_data |> as_tibble()
+```
+
+# Volunteers
+
+```{r}
+old_data$vols
+```
+# Confirmations
+
+```{r}
+old_data$confirm |> 
+  unnest(cols = dias)
+```
+
+# Comunicados
+```{r}
+old_data$comunicados |> 
+  unnest()
+```
+
+# Activities
+```{r}
+old_data$acts
+```
+
+# Centers
+```{r}
+old_data$centros
+```
+
