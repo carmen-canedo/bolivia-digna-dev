@@ -18,12 +18,11 @@ old_data <- fromJSON("migration-data/migration-data.json")
 ```
 
 # Volunteers
-
 ```{r}
 old_data$vols
 ```
-# Confirmations
 
+# Confirmations
 ```{r}
 old_data$confirm |> 
   unnest(cols = dias)
@@ -40,8 +39,39 @@ old_data$comunicados |>
 old_data$acts
 ```
 
+# Activity Types
+```{r}
+old_data$actTipos
+```
+
 # Centers
 ```{r}
 old_data$centros
+```
+
+# Documentation
+```{r}
+old_data$docsPolitica
+```
+
+# Tasks
+```{r}
+old_data$tareas
+```
+
+# Accept
+```{r}
+old_data$aceptaciones
+```
+
+# Pass
+```{r}
+# old_data$passAdmin
+# old_data$passVoluntario
+```
+
+# Password Meta
+```{r}
+old_data$passMeta
 ```
 
