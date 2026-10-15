@@ -42,16 +42,13 @@ old_data |>
   map_int(nrow)
 ```
 ```{r}
-
-```
-
-
-```{r}
-# Count records in each list
+# Look at column names in each list
 old_data |> 
   keep(~ is.list(.x) && !is.data.frame(.x)) |> 
   map(names)
 ```
+
+Weird naming/formatting for aceptaciones. Presumably the number is the vol ID?
 
 ```{r}
 old_data |> 
@@ -61,7 +58,7 @@ old_data |>
 
 # Volunteers
 ```{r}
-old_data$vols
+volunteers <- old_data$vols
 
 # Check duplicates
 old_data$vols |> 
@@ -161,7 +158,7 @@ The volunteer interface creates a new confirmation obs `dias:{}`
 # }));
 ```
 
-## Cleaning confirmados
+## Cleaning confirmaciones
 Need to 
 
   1. Normalize empty strings to NA
@@ -170,7 +167,7 @@ Need to
   4. Transform them into two PostgreSQL tables
 ```{r}
 # Normalize empty strings
-confirm_full <- old_data$confirm |>
+confirmaciones_completas <- old_data$confirm |>
   # select(id, volId, dias) |> 
   unnest(cols = dias) |>
   clean_names() |> 
@@ -180,21 +177,77 @@ confirm_full <- old_data$confirm |>
          obs = na_if(obs, ""))
 
 # Check duplicates
-confirm_dupes <- confirm_full |> 
+confirm_dupes <- confirmaciones_completas |> 
   count(vol_id, semana, bloque, dia) |> 
   filter(n > 1)
 
 # Compare full values for each duplicate record
-dup_compare <- confirm_full |> 
+dupe_compare <- confirmaciones_completas |> 
   semi_join(confirm_dupes, by = c("vol_id", "semana", "bloque", "dia")) |> 
   arrange(semana, bloque, dia, id)
 
-glimpse(dup_compare)
+# glimpse(dupe_compare)
 ```
+
 All NA: `centro`, `obs`, `validado`, `estado` for August 17
 Identical, can keep one record: `vol_id`, `semana`, `bloque`
 Combine: `estado` August 3
 ID's can be kept because they will be used in the migration
+
+```{r}
+# Merge
+confirmaciones_completas <- confirmaciones_completas |> 
+  group_by(vol_id, semana, bloque, dia) |> 
+  summarize(legacy_ids = list(unique(id)),
+            estado = first(estado, na_rm = TRUE),
+            centro = first(centro, na_rm = TRUE),
+            obs = first(obs, na_rm = TRUE),
+            validado = first(validado, na_rm = TRUE),
+            .groups = "drop")
+
+# glimpse(confirmaciones_completas)
+```
+
+```{r}
+# Check weekly duplicates
+# Check for conflicting weekly-level values
+confirmaciones_completas |>
+  group_by(vol_id, semana, bloque) |>
+  summarize(n_centros = n_distinct(centro, na.rm = TRUE),
+            n_obs = n_distinct(obs, na.rm = TRUE),
+            n_validado = n_distinct(validado, na.rm = TRUE),
+            .groups = "drop") |>
+  filter(n_centros > 1 |
+           n_obs > 1 |
+           n_validado > 1)
+```
+
+```{r}
+rm(confirm_missigness, confirm_dupes, dupe_compare)
+```
+
+## Migrate confirmaciones
+### Weekly
+```{r}
+confirmacion_semanal <- confirmaciones_completas |> 
+  group_by(vol_id, semana, bloque) |> 
+  summarize(legacy_ids = list(unique(unlist(legacy_ids))),
+            centro = first(centro, na_rm = TRUE),
+            obs = first(obs, na_rm = TRUE),
+            validado = first(validado, na_rm = TRUE),
+            .groups = "drop")
+
+glimpse(confirmacion_semanal)
+```
+
+### Daily
+```{r}
+confirmacion_dia <- confirmaciones_completas |> 
+  filter(!is.na(estado)) |> 
+  select(vol_id, semana, bloque, dia, estado)
+
+glimpse(confirmacion_dia)
+```
 
 
 # Comunicados
