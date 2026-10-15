@@ -248,6 +248,123 @@ confirmacion_dia <- confirmaciones_completas |>
 
 glimpse(confirmacion_dia)
 ```
+### Validate relationships between the tables
+Every record in `confirmacion_dia` should have a parent record in `confirmacion_semanal`.
+Should be 0 here
+```{r}
+confirmacion_dia |>
+  anti_join(confirmacion_semanal,
+            by = c("vol_id", "semana", "bloque"))
+```
+
+### Add temp IDs to weekly confirmations
+```{r}
+confirmacion_semanal <- confirmacion_semanal |> 
+  mutate(id = row_number(), .before = 1)
+```
+
+### Add confirmation id's to daily confirmations
+```{r}
+confirmacion_dia <- confirmacion_dia |> 
+  left_join(confirmacion_semanal |> 
+              select(id, vol_id, semana, bloque),
+            by = c("vol_id", "semana", "bloque")) |> 
+  rename(confirmacion_id = id) |> 
+  select(confirmacion_id, dia, estado)
+
+glimpse(confirmacion_dia)
+```
+
+```{r}
+# Check no missing ID
+sum(is.na(confirmacion_dia$confirmacion_id))
+
+# Check for duplicate confirmation-day combinations
+confirmacion_dia |>
+  count(confirmacion_id, dia) |>
+  filter(n > 1)
+```
+
+## Validate migrations
+```{r}
+# Validate confirmation relationships
+confirmacion_dia |>
+  summarise(n_registros = n(),
+            ids_faltantes = sum(is.na(confirmacion_id)),
+            ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id),
+            dias_duplicados = n() - n_distinct(confirmacion_id, dia),
+            estados_faltantes = sum(is.na(estado)))
+```
+
+# Confirmaciones y centros
+Checking how the center names appear in this part of the legacy data to inform how it'll map to postgres.
+```{r}
+# Legacy centers in weekly confirmations
+confirmacion_semanal |> 
+  count(centro, sort = TRUE)
+
+# Center lookup table
+centros_lookup <- old_data$centros |>
+  clean_names() |>
+  select(centro_id = id,
+         centro = nombre)
+
+centros_lookup
+
+# Map legacy center ID's to weekly confirmations
+confirmacion_semanal <- confirmacion_semanal |>
+  left_join(centros_lookup, 
+            by = "centro",
+            relationship = "many-to-one") |>
+  relocate(centro_id, .after = centro)
+```
+### Centros y confirmaciones mapping validation
+```{r}
+glimpse(confirmacion_semanal)
+
+# Count unmatched center names
+unmatched_centros <- confirmacion_semanal |>
+  filter(!is.na(centro) & is.na(centro_id))
+
+nrow(unmatched_centros)
+
+unmatched_centros |>
+  select(-legacy_ids)
+
+# Check center mapping
+confirmacion_semanal |>
+  count(centro, centro_id, sort = TRUE)
+```
+## Confirm data types
+Also clarifying week start
+```{r}
+# Convert weekly confirmation fields to SQL-compatible types
+confirmacion_semanal <- confirmacion_semanal |>
+  mutate(vol_id = as.integer(vol_id),
+         semana = as.Date(semana)) |>
+  rename(semana_inicio = semana)
+```
+
+### Type validation
+```{r}
+glimpse(confirmacion_semanal)
+
+sum(is.na(confirmacion_semanal$vol_id))
+sum(is.na(confirmacion_semanal$semana_inicio))
+```
+
+## Finalize daily table
+Double check `confirmacion_dia` has the same indentifier types as `confirmacion_semanal`
+```{r}
+# Check column types
+glimpse(confirmacion_dia)
+
+# Verify foreign key types and relationships
+confirmacion_dia |>
+  summarise(n_registros = n(),
+            ids_faltantes = sum(is.na(confirmacion_id)),
+            ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id))
+```
 
 
 # Comunicados
