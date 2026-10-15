@@ -125,6 +125,34 @@ voluntarios <- voluntarios |>
   rename(legacy_usuario = vol_usuario)
 ```
 
+# Prepare volunteer profiles for migration
+## Staging df for `public.perfiles`
+```{r}
+perfiles_legacy <- voluntarios |> 
+  transmute(legacy_vol_id = as.character(id),
+            legacy_vol_usuario = legacy_usuario,
+            nombre_completo = nombre,
+            rol_app = "voluntario",
+            rol_sistema = NA_character_,
+            activo = activo)
+
+glimpse(perfiles_legacy)
+```
+
+## Separate volunteer names
+Manually separating names
+```{r}
+# 5.2 Prepare names for manual separation
+nombres_revision <- perfiles_legacy |>
+  select(legacy_vol_id, nombre_completo) |>
+  mutate(nombre = NA_character_,
+         apellido = NA_character_,
+         segundo_apellido = NA_character_)
+
+# write.csv(nombres_revision, "migration-data/nombres_revision.csv",
+          # row.names = FALSE, na = "")
+```
+
 
 # Confirmaciones
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
