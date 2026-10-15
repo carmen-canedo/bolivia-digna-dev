@@ -15,6 +15,7 @@ knitr::opts_chunk$set(eval = FALSE)
 library(tidyverse)
 library(jsonlite)
 library(janitor)
+library(stringi)
 ```
 
 # Initial Data
@@ -58,13 +59,72 @@ old_data |>
 
 # Voluntarios
 ```{r}
-volunteers <- old_data$vols
+glimpse(old_data$vols)
+
+# Missing vals
+old_data$vols |> 
+  summarize(across(everything(), ~sum(is.na(.x))))
 
 # Check duplicates
 old_data$vols |> 
   count(id) |> 
   filter(n > 1)
 ```
+Need to address:
+
+  1. Appropriate column types
+    - `edad` is a character
+    - `disponibilidad`, `bloques`, `ubicaciones` are list columns
+  2. Accents and capitalizations
+  3. Empty strings vs NA
+    - `proyectoPref` and `comentarios`
+  4. Legacy username
+    - `volUsuario`
+
+## Frequencies of character columns
+
+```{r}
+old_data$vols |>
+  summarise(across(c(area, rol, tipo, edad), ~ n_distinct(.x)))
+
+old_data$vols |>
+  count(area, rol, tipo, sort = TRUE)
+
+old_data$vols |>
+  summarise(across(where(is.character), ~ sum(trimws(.x) == "", na.rm = TRUE)))
+```
+
+# Initialize working vols df
+```{r}
+voluntarios <- old_data$vols |>
+  clean_names() |>
+  # handles step 3, empty string to NA
+  mutate(across(where(is.character),
+                ~ na_if(trimws(.x), "")))|>
+  relocate(id, vol_usuario)
+
+glimpse(voluntarios)
+```
+## 1. Fix column types
+```{r}
+voluntarios <- voluntarios |>
+  mutate(edad = as.integer(edad))
+```
+
+## 2. Normalize accents and capitalization
+```{r}
+# 2. Normalize accents and capitalization
+voluntarios <- voluntarios |>
+  mutate(across(c(area, rol, tipo), ~ stri_trans_general(str_to_lower(.x), "Latin-ASCII")))
+```
+
+## 4. Preserve legacy usernames
+```{r}
+# 4. Preserve legacy usernames
+voluntarios <- voluntarios |>
+  rename(legacy_usuario = vol_usuario)
+```
+
 
 # Confirmaciones
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.

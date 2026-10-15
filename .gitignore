@@ -31,6 +31,8 @@ dist/
 supabase/.temp/
 supabase/.branches/
 .Rproj.user
+.Rdata
+.Rhistory
 
 # Quarto / R Markdown rendered outputs
 *.html
