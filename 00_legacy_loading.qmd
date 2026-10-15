@@ -5,6 +5,11 @@ editor: visual
 ---
 
 ```{r}
+knitr::opts_chunk$set(eval = FALSE)
+```
+
+
+```{r}
 library(tidyverse)
 library(jsonlite)
 ```
@@ -17,15 +22,64 @@ old_data <- fromJSON("migration-data/migration-data.json")
 # bd_data <- old_data |> as_tibble()
 ```
 
+## Looking through structure
+```{r}
+class(old_data)
+typeof(old_data)
+length(old_data)
+names(old_data)
+```
+
+```{r}
+sapply(old_data, class)
+```
+
+```{r}
+# Count records in each df
+old_data |> 
+  keep(is.data.frame) |> 
+  map_int(nrow)
+```
+```{r}
+
+```
+
+
+```{r}
+# Count records in each list
+old_data |> 
+  keep(~ is.list(.x) && !is.data.frame(.x)) |> 
+  map(names)
+```
+
+```{r}
+old_data |> 
+  pluck("aceptaciones")
+```
+
+
 # Volunteers
 ```{r}
 old_data$vols
+
+# Check duplicates
+old_data$vols |> 
+  count(id) |> 
+  filter(n > 1)
 ```
 
 # Confirmations
 ```{r}
+names(old_data$confirm)
+
 old_data$confirm |> 
   unnest(cols = dias)
+
+# Check duplicates
+old_data$confirm |> 
+  # unnest(cols = dias) |> 
+  count(volId, semana, bloque) |> 
+  filter(n > 1)
 ```
 
 # Comunicados
@@ -72,6 +126,6 @@ old_data$aceptaciones
 
 # Password Meta
 ```{r}
-old_data$passMeta
+# old_data$passMeta
 ```
 
