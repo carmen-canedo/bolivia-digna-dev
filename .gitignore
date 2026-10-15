@@ -2,6 +2,7 @@
 *.txt
 *.docx
 *.json
+*.csv
 outlines/
 reference-pres/
 
