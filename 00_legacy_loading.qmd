@@ -12,6 +12,7 @@ knitr::opts_chunk$set(eval = FALSE)
 ```{r}
 library(tidyverse)
 library(jsonlite)
+library(janitor)
 ```
 
 # Initial Data
@@ -71,7 +72,9 @@ old_data$vols |>
 # Confirmations
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
 There is also a mix of NA values and empty strings that I think are meant to represent an NA value.
-For migration, will consider any empty strings to be an NA
+For migration, will consider any empty strings to be an NA.
+`validado` only has TRUE or NA, will convert NA to FALSE.
+`centros` and `obs` both contain empty strings that should be NA values
 ```{r}
 names(old_data$confirm)
 
@@ -91,6 +94,7 @@ old_data$confirm |>
   select(id, volId, semana, bloque, dias) |> 
   unnest(dias)
 ```
+
 ```{r}
 # double check empty string in dias columns for single week
 old_data$confirm |>
@@ -131,31 +135,66 @@ The volunteer interface creates a new confirmation obs `dias:{}`
 # Toggle fn with params id and dia
 # setConfirm() is React state setter; receives updated data from logic inside it
 # .map() iterates over the array, r represents single record at a time
-const toggle = (id, dia) => setConfirm(confirm.map(r => {
-  
-  # Find the confirmation record corresponding to selected row; leave other records unchanged
-  if (r.id !== id) return r;
-  
-  # Get current status for selected day
-  # If day has no status treat as an empty string
-  const actual = r.dias[dia] || "";
-  
-  # If attendance has already been assigned by admin, vol can't change it
-  if (actual === "asistio" || actual === "falta") return r;
-  
-  # Update status for selected day
-  return {
-    # ... is a spread operator, gives full info of the properties for that object
-    ...r,
-    dias: {
-      ...r.dias,
-      # If true, day was previously selected, so deselect
-      # Else, confirm availability
-      [dia]: actual === "confirmado" ? "" : "confirmado"
-    }
-  }
-}));
+# const toggle = (id, dia) => setConfirm(confirm.map(r => {
+#   
+#   # Find the confirmation record corresponding to selected row; leave other records unchanged
+#   if (r.id !== id) return r;
+#   
+#   # Get current status for selected day
+#   # If day has no status treat as an empty string
+#   const actual = r.dias[dia] || "";
+#   
+#   # If attendance has already been assigned by admin, vol can't change it
+#   if (actual === "asistio" || actual === "falta") return r;
+#   
+#   # Update status for selected day
+#   return {
+#     # ... is a spread operator, gives full info of the properties for that object
+#     ...r,
+#     dias: {
+#       ...r.dias,
+#       # If true, day was previously selected, so deselect
+#       # Else, confirm availability
+#       [dia]: actual === "confirmado" ? "" : "confirmado"
+#     }
+#   }
+# }));
 ```
+
+## Cleaning confirmados
+Need to 
+
+  1. Normalize empty strings to NA
+  2. Identify and resolve duplicate weekly records
+  3. Validate cleaned confirmations
+  4. Transform them into two PostgreSQL tables
+```{r}
+# Normalize empty strings
+confirm_full <- old_data$confirm |>
+  # select(id, volId, dias) |> 
+  unnest(cols = dias) |>
+  clean_names() |> 
+  pivot_longer(c(lunes, martes, miercoles, jueves, viernes), names_to = "dia", values_to = "estado") |>
+  mutate(estado = na_if(estado, ""),
+         centro = na_if(centro, ""),
+         obs = na_if(obs, ""))
+
+# Check duplicates
+confirm_dupes <- confirm_full |> 
+  count(vol_id, semana, bloque, dia) |> 
+  filter(n > 1)
+
+# Compare full values for each duplicate record
+dup_compare <- confirm_full |> 
+  semi_join(confirm_dupes, by = c("vol_id", "semana", "bloque", "dia")) |> 
+  arrange(semana, bloque, dia, id)
+
+glimpse(dup_compare)
+```
+All NA: `centro`, `obs`, `validado`, `estado` for August 17
+Identical, can keep one record: `vol_id`, `semana`, `bloque`
+Combine: `estado` August 3
+ID's can be kept because they will be used in the migration
 
 
 # Comunicados
