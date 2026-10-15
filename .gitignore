@@ -31,3 +31,11 @@ dist/
 supabase/.temp/
 supabase/.branches/
 .Rproj.user
+
+# Quarto / R Markdown rendered outputs
+*.html
+# Keep the application HTML
+!index.html
+*_files/
+*_cache/
+.quarto/
