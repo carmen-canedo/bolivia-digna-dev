@@ -69,18 +69,94 @@ old_data$vols |>
 ```
 
 # Confirmations
+A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
+There is also a mix of NA values and empty strings that I think are meant to represent an NA value.
+For migration, will consider any empty strings to be an NA
 ```{r}
 names(old_data$confirm)
 
-old_data$confirm |> 
-  unnest(cols = dias)
+# old_data$confirm |> 
+#   unnest(cols = dias)
 
 # Check duplicates
 old_data$confirm |> 
   # unnest(cols = dias) |> 
   count(volId, semana, bloque) |> 
   filter(n > 1)
+
+# Check if duplicates are identical
+old_data$confirm |> 
+  filter(volId == 45,
+         semana %in% c("2026-08-03", "2026-08-17")) |> 
+  select(id, volId, semana, bloque, dias) |> 
+  unnest(dias)
 ```
+```{r}
+# double check empty string in dias columns for single week
+old_data$confirm |>
+  filter(volId == 45, semana == "2026-08-17") |>
+  unnest(cols = dias) |>
+  select(id, Martes, Jueves, Viernes, Miércoles, Lunes) |>
+  mutate(across(-id, ~ case_when(is.na(.x) ~ "MISSING (NA)",
+                                 .x == "" ~ "EMPTY STRING",
+                                 TRUE ~ .x)))
+
+old_data$confirm <- old_data$confirm |> 
+  mutate(volId = as.character(volId))
+
+# look at missingness across all weeks in dias
+confirm_missigness <- old_data$confirm |>
+  select(id, volId, dias) |> 
+  unnest(cols = dias) |>
+  pivot_longer(c(-id,-volId), names_to = "dia", values_to = "estado") |> 
+  mutate(estado = case_when(is.na(estado) ~ "MISSING (NA)",
+                            estado == "" ~ "EMPTY STRING",
+                            TRUE ~ estado))
+
+# write_csv(confirm_missigness, "confirm_missingness.csv")
+```
+
+This is how dias are handled in the original index.html
+The volunteer interface creates a new confirmation obs `dias:{}`
+```{html}
+# original
+  # const toggle=(id,dia)=>setConfirm(confirm.map(r=>{
+  #   if(r.id!==id)return r;
+  #   const actual=r.dias[dia]||"";
+  #   if(actual==="asistio"||actual==="falta")return r;
+  #   return {...r,dias:{...r.dias,[dia]:actual==="confirmado"?"":"confirmado"}};
+  # }));
+
+# More readable
+# Toggle fn with params id and dia
+# setConfirm() is React state setter; receives updated data from logic inside it
+# .map() iterates over the array, r represents single record at a time
+const toggle = (id, dia) => setConfirm(confirm.map(r => {
+  
+  # Find the confirmation record corresponding to selected row; leave other records unchanged
+  if (r.id !== id) return r;
+  
+  # Get current status for selected day
+  # If day has no status treat as an empty string
+  const actual = r.dias[dia] || "";
+  
+  # If attendance has already been assigned by admin, vol can't change it
+  if (actual === "asistio" || actual === "falta") return r;
+  
+  # Update status for selected day
+  return {
+    # ... is a spread operator, gives full info of the properties for that object
+    ...r,
+    dias: {
+      ...r.dias,
+      # If true, day was previously selected, so deselect
+      # Else, confirm availability
+      [dia]: actual === "confirmado" ? "" : "confirmado"
+    }
+  }
+}));
+```
+
 
 # Comunicados
 ```{r}
