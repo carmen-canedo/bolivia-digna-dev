@@ -70,7 +70,7 @@ old_data$vols |>
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
 There is also a mix of NA values and empty strings that I think are meant to represent an NA value.
 For migration, will consider any empty strings to be an NA.
-`validado` only has TRUE or NA, will convert NA to FALSE.
+`validado` only has TRUE or NA, will leave NA as NA.
 `centros` and `obs` both contain empty strings that should be NA values
 ```{r}
 names(old_data$confirm)
@@ -119,43 +119,43 @@ confirm_missigness <- old_data$confirm |>
 
 This is how dias are handled in the original index.html
 The volunteer interface creates a new confirmation obs `dias:{}`
-```{html}
-# original
-  # const toggle=(id,dia)=>setConfirm(confirm.map(r=>{
-  #   if(r.id!==id)return r;
-  #   const actual=r.dias[dia]||"";
-  #   if(actual==="asistio"||actual==="falta")return r;
-  #   return {...r,dias:{...r.dias,[dia]:actual==="confirmado"?"":"confirmado"}};
-  # }));
+```javascript
+<!-- # original -->
+<!--   const toggle=(id,dia)=>setConfirm(confirm.map(r=>{ -->
+<!--     if(r.id!==id)return r; -->
+<!--     const actual=r.dias[dia]||""; -->
+<!--     if(actual==="asistio"||actual==="falta")return r; -->
+<!--     return {...r,dias:{...r.dias,[dia]:actual==="confirmado"?"":"confirmado"}}; -->
+<!--   })); -->
 
-# More readable
-# Toggle fn with params id and dia
-# setConfirm() is React state setter; receives updated data from logic inside it
-# .map() iterates over the array, r represents single record at a time
-# const toggle = (id, dia) => setConfirm(confirm.map(r => {
-#   
-#   # Find the confirmation record corresponding to selected row; leave other records unchanged
-#   if (r.id !== id) return r;
-#   
-#   # Get current status for selected day
-#   # If day has no status treat as an empty string
-#   const actual = r.dias[dia] || "";
-#   
-#   # If attendance has already been assigned by admin, vol can't change it
-#   if (actual === "asistio" || actual === "falta") return r;
-#   
-#   # Update status for selected day
-#   return {
-#     # ... is a spread operator, gives full info of the properties for that object
-#     ...r,
-#     dias: {
-#       ...r.dias,
-#       # If true, day was previously selected, so deselect
-#       # Else, confirm availability
-#       [dia]: actual === "confirmado" ? "" : "confirmado"
-#     }
-#   }
-# }));
+<!-- # More readable -->
+<!-- # Toggle fn with params id and dia -->
+<!-- # setConfirm() is React state setter; receives updated data from logic inside it -->
+<!-- # .map() iterates over the array, r represents single record at a time -->
+<!-- # const toggle = (id, dia) => setConfirm(confirm.map(r => { -->
+<!-- # -->
+<!--   # Find the confirmation record corresponding to selected row; leave other records unchanged -->
+<!--   if (r.id !== id) return r; -->
+
+<!--   # Get current status for selected day -->
+<!--   # If day has no status treat as an empty string -->
+<!--   const actual = r.dias[dia] || ""; -->
+
+<!--   # If attendance has already been assigned by admin, vol can't change it -->
+<!--   if (actual === "asistio" || actual === "falta") return r; -->
+
+<!--   # Update status for selected day -->
+<!--   return { -->
+<!--     # ... is a spread operator, gives full info of the properties for that object -->
+<!--     ...r, -->
+<!--     dias: { -->
+<!--       ...r.dias, -->
+<!--       # If true, day was previously selected, so deselect -->
+<!--       # Else, confirm availability -->
+<!--       [dia]: actual === "confirmado" ? "" : "confirmado" -->
+<!--     } -->
+<!--   } -->
+<!-- })); -->
 ```
 
 ## Cleaning confirmaciones
@@ -279,13 +279,13 @@ glimpse(confirmacion_dia)
 ```
 
 ```{r}
-# Check no missing ID
-sum(is.na(confirmacion_dia$confirmacion_id))
-
-# Check for duplicate confirmation-day combinations
-confirmacion_dia |>
-  count(confirmacion_id, dia) |>
-  filter(n > 1)
+# # Check no missing ID
+# sum(is.na(confirmacion_dia$confirmacion_id))
+# 
+# # Check for duplicate confirmation-day combinations
+# confirmacion_dia |>
+#   count(confirmacion_id, dia) |>
+#   filter(n > 1)
 ```
 
 ## Validate migrations
@@ -364,11 +364,11 @@ Double check `confirmacion_dia` has the same indentifier types as `confirmacion_
 # Check column types
 glimpse(confirmacion_dia)
 
-# Verify foreign key types and relationships
-confirmacion_dia |>
-  summarise(n_registros = n(),
-            ids_faltantes = sum(is.na(confirmacion_id)),
-            ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id))
+# # Verify foreign key types and relationships
+# confirmacion_dia |>
+#   summarise(n_registros = n(),
+#             ids_faltantes = sum(is.na(confirmacion_id)),
+#             ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id))
 ```
 
 
