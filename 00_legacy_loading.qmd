@@ -1,10 +1,12 @@
 ---
 title: "Legacy Data Transformation"
+author: "Carmen Canedo"
+toc: True
 format: html
 editor: visual
 ---
 
-```{r}
+```{r, include=FALSE}
 knitr::opts_chunk$set(eval = FALSE)
 ```
 
@@ -19,8 +21,6 @@ library(janitor)
 
 ```{r}
 old_data <- fromJSON("migration-data/migration-data.json")
-
-# bd_data <- old_data |> as_tibble()
 ```
 
 ## Looking through structure
@@ -56,7 +56,7 @@ old_data |>
 ```
 
 
-# Volunteers
+# Voluntarios
 ```{r}
 volunteers <- old_data$vols
 
@@ -66,7 +66,7 @@ old_data$vols |>
   filter(n > 1)
 ```
 
-# Confirmations
+# Confirmaciones
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
 There is also a mix of NA values and empty strings that I think are meant to represent an NA value.
 For migration, will consider any empty strings to be an NA.
@@ -165,6 +165,8 @@ Need to
   2. Identify and resolve duplicate weekly records
   3. Validate cleaned confirmations
   4. Transform them into two PostgreSQL tables
+  
+### 1. Normalize empty strings to NA
 ```{r}
 # Normalize empty strings
 confirmaciones_completas <- old_data$confirm |>
@@ -208,6 +210,7 @@ confirmaciones_completas <- confirmaciones_completas |>
 # glimpse(confirmaciones_completas)
 ```
 
+### 2. Check duplicates
 ```{r}
 # Check weekly duplicates
 # Check for conflicting weekly-level values
@@ -226,8 +229,7 @@ confirmaciones_completas |>
 rm(confirm_missigness, confirm_dupes, dupe_compare)
 ```
 
-## Migrate confirmaciones
-### Weekly
+#### Weekly duplicate merge
 ```{r}
 confirmacion_semanal <- confirmaciones_completas |> 
   group_by(vol_id, semana, bloque) |> 
@@ -240,7 +242,7 @@ confirmacion_semanal <- confirmaciones_completas |>
 glimpse(confirmacion_semanal)
 ```
 
-### Daily
+#### Daily duplicate merge
 ```{r}
 confirmacion_dia <- confirmaciones_completas |> 
   filter(!is.na(estado)) |> 
@@ -248,7 +250,8 @@ confirmacion_dia <- confirmaciones_completas |>
 
 glimpse(confirmacion_dia)
 ```
-### Validate relationships between the tables
+
+### 3. Validate relationships between the tables
 Every record in `confirmacion_dia` should have a parent record in `confirmacion_semanal`.
 Should be 0 here
 ```{r}
@@ -256,14 +259,14 @@ confirmacion_dia |>
   anti_join(confirmacion_semanal,
             by = c("vol_id", "semana", "bloque"))
 ```
-
-### Add temp IDs to weekly confirmations
+### 4. Transform into two tables for postgres
+#### Add temp IDs to weekly confirmations
 ```{r}
 confirmacion_semanal <- confirmacion_semanal |> 
   mutate(id = row_number(), .before = 1)
 ```
 
-### Add confirmation id's to daily confirmations
+#### Add confirmation id's to daily confirmations
 ```{r}
 confirmacion_dia <- confirmacion_dia |> 
   left_join(confirmacion_semanal |> 
@@ -296,8 +299,10 @@ confirmacion_dia |>
             estados_faltantes = sum(is.na(estado)))
 ```
 
-# Confirmaciones y centros
+## Confirmaciones y centros
 Checking how the center names appear in this part of the legacy data to inform how it'll map to postgres.
+
+### Centros lookup table
 ```{r}
 # Legacy centers in weekly confirmations
 confirmacion_semanal |> 
@@ -365,6 +370,8 @@ confirmacion_dia |>
             ids_faltantes = sum(is.na(confirmacion_id)),
             ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id))
 ```
+
+
 
 
 # Comunicados
