@@ -16,6 +16,8 @@ library(tidyverse)
 library(jsonlite)
 library(janitor)
 library(stringi)
+library(writexl)
+library(readxl)
 ```
 
 # Initial Data
@@ -142,17 +144,82 @@ glimpse(perfiles_legacy)
 ## Separate volunteer names
 Manually separating names
 ```{r}
-# 5.2 Prepare names for manual separation
+# Prepare names for manual separation
 nombres_revision <- perfiles_legacy |>
   select(legacy_vol_id, nombre_completo) |>
   mutate(nombre = NA_character_,
          apellido = NA_character_,
          segundo_apellido = NA_character_)
 
-# write.csv(nombres_revision, "migration-data/nombres_revision.csv",
-          # row.names = FALSE, na = "")
+# library(writexl)
+# write_xlsx(nombres_revision, "migration-data/nombres_revision.xlsx")
 ```
 
+## Join separated names to legacy data
+```{r}
+# Read in manually separated names
+nombres_corregidos <- read_excel("migration-data/nombres_revision.xlsx",
+                                 col_types = "text")
+
+# Join to legacy profile
+perfiles_legacy <- perfiles_legacy |> 
+  left_join(nombres_corregidos |> 
+              select(legacy_vol_id, nombre, apellido, segundo_apellido),
+            by = "legacy_vol_id") |> 
+  relocate(legacy_vol_id,
+           legacy_vol_usuario,
+           nombre,
+           apellido,
+           segundo_apellido)
+
+glimpse(perfiles_legacy)
+```
+
+## Remove `activo`
+New database will distinguish between `perfiles.activo` and `vols.activo`.
+`perfiles.activo` would be whether someone is allowed to log in.
+`vols.activo` is whether someone is currently an active volunteer.
+For now will remove the `activo` column from `perfiles_legacy`.
+```{r}
+perfiles_legacy <- perfiles_legacy |> 
+  select(-activo)
+```
+
+## Prepare volunteer records for migration
+`legacy_vol_id` is temp identifier until volunteer is linked to a Supabase Auth UUID.
+```{r}
+vols_legacy <- voluntarios |> 
+  transmute(legacy_vol_id = as.character(id),
+            activo = activo,
+            rol = rol,
+            tipo_voluntario = tipo,
+            telefono = telefono,
+            correo = correo,
+            fecha_nacimiento = as.Date(NA),
+            area = area,
+            pais_origen = NA_character_,
+            area_estudio = area_estudio,
+            horas_semana = horas_semana,
+            horas_acumuladas = horas_acumuladas,
+            faltas = faltas,
+            centro_preferido_id = NA_integer_,
+            comentarios = comentarios)
+
+glimpse(vols_legacy)
+```
+
+### Clearning `telefono` and `correo`
+Eventually will have rules in the registration process with Supbase that will normalize formatting for these. This is just to ease into migration.
+
+```{r}
+vols_legacy <- vols_legacy |> 
+  mutate(telefono = str_remove_all(telefono, "[\\s]"),
+         # Add Bolivia country code to local numbers
+         telefono = if_else(tipo_voluntario == "nacional",
+                            paste0("+591", telefono),
+                            telefono),
+         correo = str_to_lower(str_trim(correo)))
+```
 
 # Confirmaciones
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
