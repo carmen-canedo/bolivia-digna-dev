@@ -251,6 +251,13 @@ voluntario_centro <- tibble(legacy_vol_id = character(),
                             centro_id = integer())
 ```
 
+## Set `activo = TRUE` in `perfiles_legacy`
+```{r}
+# All existing volunteers will be able to login
+perfiles_legacy <- perfiles_legacy |> 
+  mutate(activo = TRUE)
+```
+
 
 # Confirmaciones
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
