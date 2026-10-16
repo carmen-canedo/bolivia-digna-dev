@@ -96,7 +96,7 @@ old_data$vols |>
   summarise(across(where(is.character), ~ sum(trimws(.x) == "", na.rm = TRUE)))
 ```
 
-# Initialize working vols df
+## Initialize working vols df
 ```{r}
 voluntarios <- old_data$vols |>
   clean_names() |>
@@ -127,7 +127,7 @@ voluntarios <- voluntarios |>
   rename(legacy_usuario = vol_usuario)
 ```
 
-# Prepare volunteer profiles for migration
+## Prepare volunteer profiles for migration
 ## Staging df for `public.perfiles`
 ```{r}
 perfiles_legacy <- voluntarios |> 
@@ -141,7 +141,7 @@ perfiles_legacy <- voluntarios |>
 glimpse(perfiles_legacy)
 ```
 
-## Separate volunteer names
+### Separate volunteer names
 Manually separating names
 ```{r}
 # Prepare names for manual separation
@@ -155,7 +155,7 @@ nombres_revision <- perfiles_legacy |>
 # write_xlsx(nombres_revision, "migration-data/nombres_revision.xlsx")
 ```
 
-## Join separated names to legacy data
+### Join separated names to legacy data
 ```{r}
 # Read in manually separated names
 nombres_corregidos <- read_excel("migration-data/nombres_revision.xlsx",
@@ -175,17 +175,18 @@ perfiles_legacy <- perfiles_legacy |>
 glimpse(perfiles_legacy)
 ```
 
-## Remove `activo`
+### Set `activo = TRUE` in `perfiles_legacy`
 New database will distinguish between `perfiles.activo` and `vols.activo`.
 `perfiles.activo` would be whether someone is allowed to log in.
 `vols.activo` is whether someone is currently an active volunteer.
-For now will remove the `activo` column from `perfiles_legacy`.
 ```{r}
+# All existing volunteers will be able to login
 perfiles_legacy <- perfiles_legacy |> 
-  select(-activo)
+  mutate(activo = TRUE)
 ```
 
-## Prepare volunteer records for migration
+
+### Prepare volunteer records for migration
 `legacy_vol_id` is temp identifier until volunteer is linked to a Supabase Auth UUID.
 ```{r}
 vols_legacy <- voluntarios |> 
@@ -215,11 +216,12 @@ Eventually will have rules in the registration process with Supbase that will no
 vols_legacy <- vols_legacy |> 
   mutate(telefono = str_remove_all(telefono, "[\\s]"),
          # Add Bolivia country code to local numbers
-         telefono = if_else(tipo_voluntario == "nacional",
+         telefono = if_else((tipo_voluntario == "nacional" & !str_starts(telefono, "\\+591")),
                             paste0("+591", telefono),
                             telefono),
          correo = str_to_lower(str_trim(correo)))
 ```
+
 
 ### Transform `disponibilidad` and `bloques`
 ```{r}
@@ -245,18 +247,13 @@ voluntarios |>
   select(id, ubicaciones) |>
   print(n = Inf, width = Inf)
 ```
+
 ## Staging df for `voluntario_centro`
 ```{r}
 voluntario_centro <- tibble(legacy_vol_id = character(),
                             centro_id = integer())
 ```
 
-## Set `activo = TRUE` in `perfiles_legacy`
-```{r}
-# All existing volunteers will be able to login
-perfiles_legacy <- perfiles_legacy |> 
-  mutate(activo = TRUE)
-```
 
 
 # Confirmaciones
