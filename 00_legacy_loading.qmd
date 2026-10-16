@@ -87,13 +87,13 @@ Need to address:
 
 ```{r}
 old_data$vols |>
-  summarise(across(c(area, rol, tipo, edad), ~ n_distinct(.x)))
+  summarize(across(c(area, rol, tipo, edad), ~ n_distinct(.x)))
 
 old_data$vols |>
   count(area, rol, tipo, sort = TRUE)
 
 old_data$vols |>
-  summarise(across(where(is.character), ~ sum(trimws(.x) == "", na.rm = TRUE)))
+  summarize(across(where(is.character), ~ sum(trimws(.x) == "", na.rm = TRUE)))
 ```
 
 ## Initialize working vols df
@@ -175,6 +175,16 @@ perfiles_legacy <- perfiles_legacy |>
 glimpse(perfiles_legacy)
 ```
 
+### Validate names after join
+```{r}
+perfiles_legacy |>
+  summarize(n_perfiles = n(),
+            ids_duplicados = n() - n_distinct(legacy_vol_id),
+            nombres_faltantes = sum(is.na(nombre)),
+            apellidos_faltantes = sum(is.na(apellido)))
+```
+
+
 ### Set `activo = TRUE` in `perfiles_legacy`
 New database will distinguish between `perfiles.activo` and `vols.activo`.
 `perfiles.activo` would be whether someone is allowed to log in.
@@ -208,6 +218,15 @@ vols_legacy <- voluntarios |>
 
 glimpse(vols_legacy)
 ```
+### Validate missing fields in `vols_legacy`
+```{r}
+vols_legacy |>
+  summarize(fecha_nacimiento = sum(!is.na(fecha_nacimiento)),
+            pais_origen = sum(!is.na(pais_origen)),
+            centro_preferido_id = sum(!is.na(centro_preferido_id)),
+            comentarios = sum(!is.na(comentarios)))
+```
+
 
 ### Cleaning `telefono` and `correo`
 Eventually will have rules in the registration process with Supbase that will normalize formatting for these. This is just to ease into migration.
@@ -232,6 +251,15 @@ voluntarios |>
   print(n = Inf, width = Inf)
 ```
 
+### Validate availability and bloques
+```{r}
+voluntarios |>
+  summarize(disponibilidad_con_datos = sum(lengths(disponibilidad) > 0),
+            bloques_con_datos = sum(lengths(bloques) > 0),
+            ubicaciones_con_datos = sum(lengths(ubicaciones) > 0))
+```
+
+
 ## Staging df for `disponibilidad_voluntario`
 Because these were empty, we can just create the tibble how we want.
 ```{r}
@@ -254,6 +282,163 @@ voluntario_centro <- tibble(legacy_vol_id = character(),
                             centro_id = integer())
 ```
 
+# Centros
+## Check legacy structure
+```{r}
+glimpse(old_data$centros)
+```
+### Check center ID's and responsible staff
+```{r}
+old_data$centros |>
+  as_tibble() |>
+  select(id, nombre, estado, responsable, img, link) |>
+  print(n = Inf, width = Inf)
+```
+### Check center ID's
+```{r}
+old_data$centros |>
+  as_tibble() |>
+  summarize(n_centros = n(),
+            ids_duplicados = n() - n_distinct(id),
+            ids_faltantes = sum(is.na(id)),
+            id_min = min(id),
+            id_max = max(id))
+```
+
+## Create `centros_legacy`
+```{r}
+centros_legacy <- old_data$centros |>
+  as_tibble() |>
+  transmute(id = id,
+            nombre = nombre,
+            img = img,
+            estado = estado,
+            responsable_id = NA_character_,
+            mapa_url = link,
+            descripcion = descripcion)
+
+glimpse(centros_legacy)
+```
+
+### Check staff
+```{r}
+old_data$centros |>
+  as_tibble() |>
+  select(id, nombre, responsable) |>
+  print(n = Inf, width = Inf)
+```
+
+## Check if responsibles exist in perfiles
+```{r}
+old_data$centros |>
+  as_tibble() |>
+  distinct(responsable) |>
+  left_join(perfiles_legacy |>
+              mutate(nombre_completo = str_squish(nombre_completo)) |>
+              select(legacy_vol_id, nombre_completo),
+            by = c("responsable" = "nombre_completo"))
+```
+
+## Update `centros_legacy` to include legacy responsible staff
+```{r}
+centros_legacy <- old_data$centros |>
+  as_tibble() |>
+  transmute(id = id,
+            nombre = nombre,
+            img = img,
+            estado = estado,
+            legacy_responsable = responsable,
+            responsable_id = NA_character_,
+            mapa_url = link,
+            descripcion = descripcion)
+```
+
+### Double check `imgData` and `adjuntos`
+```{r}
+old_data$centros |>
+  as_tibble() |>
+  summarize(img_data_con_datos = sum(!is.na(imgData) & nzchar(imgData)),
+            adjuntos_con_datos = sum(lengths(adjuntos) > 0))
+```
+
+### Inspect servicios
+```{r}
+old_data$centros |>
+  as_tibble() |>
+  select(id, nombre, servicios) |>
+  unnest(servicios, names_sep = "_") |> 
+  glimpse()
+```
+
+## Create `servicios_legacy`
+Flatten nested records into staging table
+```{r}
+servicios_legacy <- old_data$centros |>
+  as_tibble() |>
+  select(centro_id = id, servicios) |>
+  unnest(servicios) |>
+  mutate(turno = stri_trans_general(str_to_lower(turno), "Latin-ASCII"),
+         # Normalize turno text
+         turno = case_when(turno == "mananas" ~ "manana",
+                           turno == "medio dia" ~ "mediodia",
+                           TRUE ~ turno))
+  
+
+glimpse(servicios_legacy)
+```
+### Check duplicate services
+```{r}
+servicios_legacy |>
+  count(centro_id, nombre, turno, dias, horario) |>
+  filter(n > 1)
+```
+### Confirm `turno` and `dias` counts
+```{r}
+servicios_legacy |>
+  count(turno)
+
+servicios_legacy |>
+  count(dias)
+```
+
+Need to make days of the week their distinct days instead of "Lunes a Viernes".
+
+```{r}
+# Move ID
+servicios_legacy <- servicios_legacy |>
+  mutate(id = row_number()) |>
+  relocate(id)
+
+servicios_centro_dias_legacy <- servicios_legacy |>
+  select(servicio_id = id, dias) |>
+  mutate(dia = rep(list(c("lunes", "martes", "miercoles", "jueves", "viernes")), n())) |>
+  select(-dias) |>
+  unnest(dia)
+
+glimpse(servicios_centro_dias_legacy)
+```
+
+```{r}
+servicios_centro_dias_legacy |>
+  count(dia)
+```
+
+## Staging `servicios_centro`
+```{r}
+servicios_centro_legacy <- servicios_legacy |>
+  select(id, centro_id, nombre, turno, horario)
+```
+
+### Validate staging `servicios_centro`
+```{r}
+servicios_centro_dias_legacy |>
+  summarize(n_registros = n(),
+            servicios_unicos = n_distinct(servicio_id),
+            ids_no_parent = sum(!servicio_id %in% servicios_centro_legacy$id))
+
+centros_legacy |>
+  count(estado)
+```
 
 
 # Confirmaciones
@@ -482,7 +667,7 @@ glimpse(confirmacion_dia)
 ```{r}
 # Validate confirmation relationships
 confirmacion_dia |>
-  summarise(n_registros = n(),
+  summarize(n_registros = n(),
             ids_faltantes = sum(is.na(confirmacion_id)),
             ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id),
             dias_duplicados = n() - n_distinct(confirmacion_id, dia),
@@ -556,7 +741,7 @@ glimpse(confirmacion_dia)
 
 # # Verify foreign key types and relationships
 # confirmacion_dia |>
-#   summarise(n_registros = n(),
+#   summarize(n_registros = n(),
 #             ids_faltantes = sum(is.na(confirmacion_id)),
 #             ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id))
 ```
