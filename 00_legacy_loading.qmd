@@ -208,7 +208,7 @@ vols_legacy <- voluntarios |>
 glimpse(vols_legacy)
 ```
 
-### Clearning `telefono` and `correo`
+### Cleaning `telefono` and `correo`
 Eventually will have rules in the registration process with Supbase that will normalize formatting for these. This is just to ease into migration.
 
 ```{r}
@@ -220,6 +220,37 @@ vols_legacy <- vols_legacy |>
                             telefono),
          correo = str_to_lower(str_trim(correo)))
 ```
+
+### Transform `disponibilidad` and `bloques`
+```{r}
+# Currently both empty lists for all obs
+voluntarios |>
+  filter(lengths(disponibilidad) > 0 | lengths(bloques) > 0) |>
+  select(id, disponibilidad, bloques) |>
+  print(n = Inf, width = Inf)
+```
+
+## Staging df for `disponibilidad_voluntario`
+Because these were empty, we can just create the tibble how we want.
+```{r}
+disponibilidad_voluntario <- tibble(legacy_vol_id = character(),
+                                    dia = character(),
+                                    bloque = character())
+```
+
+### Check volunteer preferences
+```{r}
+voluntarios |>
+  filter(lengths(ubicaciones) > 0) |>
+  select(id, ubicaciones) |>
+  print(n = Inf, width = Inf)
+```
+## Staging df for `voluntario_centro`
+```{r}
+voluntario_centro <- tibble(legacy_vol_id = character(),
+                            centro_id = integer())
+```
+
 
 # Confirmaciones
 A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
