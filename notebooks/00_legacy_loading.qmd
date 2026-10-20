@@ -4,6 +4,9 @@ author: "Carmen Canedo"
 toc: True
 format: html
 editor: visual
+project:
+  type: default
+  output-dir: _output
 ---
 
 ```{r, include=FALSE}
@@ -11,7 +14,7 @@ knitr::opts_chunk$set(eval = FALSE)
 ```
 
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(jsonlite)
 library(janitor)
@@ -44,6 +47,7 @@ old_data |>
   keep(is.data.frame) |> 
   map_int(nrow)
 ```
+
 ```{r}
 # Look at column names in each list
 old_data |> 

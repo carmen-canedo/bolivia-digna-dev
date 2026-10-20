@@ -33,6 +33,7 @@ supabase/.branches/
 .Rproj.user
 .Rdata
 .Rhistory
+.Ruserdata
 
 # Quarto / R Markdown rendered outputs
 *.html
@@ -41,3 +42,4 @@ supabase/.branches/
 *_files/
 *_cache/
 .quarto/
+_output/
