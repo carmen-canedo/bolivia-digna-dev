@@ -5,7 +5,10 @@ format: html
 editor: visual
 ---
 
-```{r}
-library(tidyverse)
+```{r, include=FALSE}
+knitr::opts_chunk$set(eval = FALSE)
 ```
 
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+```

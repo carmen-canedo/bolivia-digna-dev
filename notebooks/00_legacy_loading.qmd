@@ -4,15 +4,11 @@ author: "Carmen Canedo"
 toc: True
 format: html
 editor: visual
-project:
-  type: default
-  output-dir: _output
 ---
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(eval = FALSE)
 ```
-
 
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -30,6 +26,7 @@ old_data <- fromJSON("migration-data/migration-data.json")
 ```
 
 ## Looking through structure
+
 ```{r}
 class(old_data)
 typeof(old_data)
@@ -62,8 +59,8 @@ old_data |>
   pluck("aceptaciones")
 ```
 
-
 # Voluntarios
+
 ```{r}
 glimpse(old_data$vols)
 
@@ -76,16 +73,13 @@ old_data$vols |>
   count(id) |> 
   filter(n > 1)
 ```
+
 Need to address:
 
-  1. Appropriate column types
-    - `edad` is a character
-    - `disponibilidad`, `bloques`, `ubicaciones` are list columns
-  2. Accents and capitalizations
-  3. Empty strings vs NA
-    - `proyectoPref` and `comentarios`
-  4. Legacy username
-    - `volUsuario`
+1.  Appropriate column types - `edad` is a character - `disponibilidad`, `bloques`, `ubicaciones` are list columns
+2.  Accents and capitalizations
+3.  Empty strings vs NA - `proyectoPref` and `comentarios`
+4.  Legacy username - `volUsuario`
 
 ## Frequencies of character columns
 
@@ -101,6 +95,7 @@ old_data$vols |>
 ```
 
 ## Initialize working vols df
+
 ```{r}
 voluntarios <- old_data$vols |>
   clean_names() |>
@@ -111,13 +106,16 @@ voluntarios <- old_data$vols |>
 
 glimpse(voluntarios)
 ```
+
 ## 1. Fix column types
+
 ```{r}
 voluntarios <- voluntarios |>
   mutate(edad = as.integer(edad))
 ```
 
 ## 2. Normalize accents and capitalization
+
 ```{r}
 # 2. Normalize accents and capitalization
 voluntarios <- voluntarios |>
@@ -125,6 +123,7 @@ voluntarios <- voluntarios |>
 ```
 
 ## 4. Preserve legacy usernames
+
 ```{r}
 # 4. Preserve legacy usernames
 voluntarios <- voluntarios |>
@@ -132,7 +131,9 @@ voluntarios <- voluntarios |>
 ```
 
 ## Prepare volunteer profiles for migration
+
 ## Staging df for `public.perfiles`
+
 ```{r}
 perfiles_legacy <- voluntarios |> 
   transmute(legacy_vol_id = as.character(id),
@@ -146,7 +147,9 @@ glimpse(perfiles_legacy)
 ```
 
 ### Separate volunteer names
+
 Manually separating names
+
 ```{r}
 # Prepare names for manual separation
 nombres_revision <- perfiles_legacy |>
@@ -160,6 +163,7 @@ nombres_revision <- perfiles_legacy |>
 ```
 
 ### Join separated names to legacy data
+
 ```{r}
 # Read in manually separated names
 nombres_corregidos <- read_excel("migration-data/nombres_revision.xlsx",
@@ -180,6 +184,7 @@ glimpse(perfiles_legacy)
 ```
 
 ### Validate names after join
+
 ```{r}
 perfiles_legacy |>
   summarize(n_perfiles = n(),
@@ -188,20 +193,20 @@ perfiles_legacy |>
             apellidos_faltantes = sum(is.na(apellido)))
 ```
 
-
 ### Set `activo = TRUE` in `perfiles_legacy`
-New database will distinguish between `perfiles.activo` and `vols.activo`.
-`perfiles.activo` would be whether someone is allowed to log in.
-`vols.activo` is whether someone is currently an active volunteer.
+
+New database will distinguish between `perfiles.activo` and `vols.activo`. `perfiles.activo` would be whether someone is allowed to log in. `vols.activo` is whether someone is currently an active volunteer.
+
 ```{r}
 # All existing volunteers will be able to login
 perfiles_legacy <- perfiles_legacy |> 
   mutate(activo = TRUE)
 ```
 
-
 ### Prepare volunteer records for migration
+
 `legacy_vol_id` is temp identifier until volunteer is linked to a Supabase Auth UUID.
+
 ```{r}
 vols_legacy <- voluntarios |> 
   transmute(legacy_vol_id = as.character(id),
@@ -222,7 +227,9 @@ vols_legacy <- voluntarios |>
 
 glimpse(vols_legacy)
 ```
+
 ### Validate missing fields in `vols_legacy`
+
 ```{r}
 vols_legacy |>
   summarize(fecha_nacimiento = sum(!is.na(fecha_nacimiento)),
@@ -231,8 +238,8 @@ vols_legacy |>
             comentarios = sum(!is.na(comentarios)))
 ```
 
-
 ### Cleaning `telefono` and `correo`
+
 Eventually will have rules in the registration process with Supbase that will normalize formatting for these. This is just to ease into migration.
 
 ```{r}
@@ -245,8 +252,8 @@ vols_legacy <- vols_legacy |>
          correo = str_to_lower(str_trim(correo)))
 ```
 
-
 ### Transform `disponibilidad` and `bloques`
+
 ```{r}
 # Currently both empty lists for all obs
 voluntarios |>
@@ -256,6 +263,7 @@ voluntarios |>
 ```
 
 ### Validate availability and bloques
+
 ```{r}
 voluntarios |>
   summarize(disponibilidad_con_datos = sum(lengths(disponibilidad) > 0),
@@ -263,9 +271,10 @@ voluntarios |>
             ubicaciones_con_datos = sum(lengths(ubicaciones) > 0))
 ```
 
-
 ## Staging df for `disponibilidad_voluntario`
+
 Because these were empty, we can just create the tibble how we want.
+
 ```{r}
 disponibilidad_voluntario <- tibble(legacy_vol_id = character(),
                                     dia = character(),
@@ -273,6 +282,7 @@ disponibilidad_voluntario <- tibble(legacy_vol_id = character(),
 ```
 
 ### Check volunteer preferences
+
 ```{r}
 voluntarios |>
   filter(lengths(ubicaciones) > 0) |>
@@ -281,24 +291,31 @@ voluntarios |>
 ```
 
 ## Staging df for `voluntario_centro`
+
 ```{r}
 voluntario_centro <- tibble(legacy_vol_id = character(),
                             centro_id = integer())
 ```
 
 # Centros
+
 ## Check legacy structure
+
 ```{r}
 glimpse(old_data$centros)
 ```
+
 ### Check center ID's and responsible staff
+
 ```{r}
 old_data$centros |>
   as_tibble() |>
   select(id, nombre, estado, responsable, img, link) |>
   print(n = Inf, width = Inf)
 ```
+
 ### Check center ID's
+
 ```{r}
 old_data$centros |>
   as_tibble() |>
@@ -310,6 +327,7 @@ old_data$centros |>
 ```
 
 ## Create `centros_legacy`
+
 ```{r}
 centros_legacy <- old_data$centros |>
   as_tibble() |>
@@ -325,6 +343,7 @@ glimpse(centros_legacy)
 ```
 
 ### Check staff
+
 ```{r}
 old_data$centros |>
   as_tibble() |>
@@ -333,6 +352,7 @@ old_data$centros |>
 ```
 
 ## Check if responsibles exist in perfiles
+
 ```{r}
 old_data$centros |>
   as_tibble() |>
@@ -344,6 +364,7 @@ old_data$centros |>
 ```
 
 ## Update `centros_legacy` to include legacy responsible staff
+
 ```{r}
 centros_legacy <- old_data$centros |>
   as_tibble() |>
@@ -358,6 +379,7 @@ centros_legacy <- old_data$centros |>
 ```
 
 ### Double check `imgData` and `adjuntos`
+
 ```{r}
 old_data$centros |>
   as_tibble() |>
@@ -366,6 +388,7 @@ old_data$centros |>
 ```
 
 ### Inspect servicios
+
 ```{r}
 old_data$centros |>
   as_tibble() |>
@@ -375,7 +398,9 @@ old_data$centros |>
 ```
 
 ## Create `servicios_legacy`
+
 Flatten nested records into staging table
+
 ```{r}
 servicios_legacy <- old_data$centros |>
   as_tibble() |>
@@ -390,13 +415,17 @@ servicios_legacy <- old_data$centros |>
 
 glimpse(servicios_legacy)
 ```
+
 ### Check duplicate services
+
 ```{r}
 servicios_legacy |>
   count(centro_id, nombre, turno, dias, horario) |>
   filter(n > 1)
 ```
+
 ### Confirm `turno` and `dias` counts
+
 ```{r}
 servicios_legacy |>
   count(turno)
@@ -428,12 +457,14 @@ servicios_centro_dias_legacy |>
 ```
 
 ## Staging `servicios_centro`
+
 ```{r}
 servicios_centro_legacy <- servicios_legacy |>
   select(id, centro_id, nombre, turno, horario)
 ```
 
 ### Validate staging `servicios_centro`
+
 ```{r}
 servicios_centro_dias_legacy |>
   summarize(n_registros = n(),
@@ -444,13 +475,10 @@ centros_legacy |>
   count(estado)
 ```
 
-
 # Confirmaciones
-A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17.
-There is also a mix of NA values and empty strings that I think are meant to represent an NA value.
-For migration, will consider any empty strings to be an NA.
-`validado` only has TRUE or NA, will leave NA as NA.
-`centros` and `obs` both contain empty strings that should be NA values
+
+A few issues here. Duplicate records for volId 45 on weeks 2026-08-03 and 2026-08-17. There is also a mix of NA values and empty strings that I think are meant to represent an NA value. For migration, will consider any empty strings to be an NA. `validado` only has TRUE or NA, will leave NA as NA. `centros` and `obs` both contain empty strings that should be NA values
+
 ```{r}
 names(old_data$confirm)
 
@@ -496,9 +524,9 @@ confirm_missigness <- old_data$confirm |>
 # write_csv(confirm_missigness, "confirm_missingness.csv")
 ```
 
-This is how dias are handled in the original index.html
-The volunteer interface creates a new confirmation obs `dias:{}`
-```javascript
+This is how dias are handled in the original index.html The volunteer interface creates a new confirmation obs `dias:{}`
+
+``` javascript
 <!-- # original -->
 <!--   const toggle=(id,dia)=>setConfirm(confirm.map(r=>{ -->
 <!--     if(r.id!==id)return r; -->
@@ -538,14 +566,16 @@ The volunteer interface creates a new confirmation obs `dias:{}`
 ```
 
 ## Cleaning confirmaciones
-Need to 
 
-  1. Normalize empty strings to NA
-  2. Identify and resolve duplicate weekly records
-  3. Validate cleaned confirmations
-  4. Transform them into two PostgreSQL tables
-  
+Need to
+
+1.  Normalize empty strings to NA
+2.  Identify and resolve duplicate weekly records
+3.  Validate cleaned confirmations
+4.  Transform them into two PostgreSQL tables
+
 ### 1. Normalize empty strings to NA
+
 ```{r}
 # Normalize empty strings
 confirmaciones_completas <- old_data$confirm |>
@@ -570,10 +600,7 @@ dupe_compare <- confirmaciones_completas |>
 # glimpse(dupe_compare)
 ```
 
-All NA: `centro`, `obs`, `validado`, `estado` for August 17
-Identical, can keep one record: `vol_id`, `semana`, `bloque`
-Combine: `estado` August 3
-ID's can be kept because they will be used in the migration
+All NA: `centro`, `obs`, `validado`, `estado` for August 17 Identical, can keep one record: `vol_id`, `semana`, `bloque` Combine: `estado` August 3 ID's can be kept because they will be used in the migration
 
 ```{r}
 # Merge
@@ -590,6 +617,7 @@ confirmaciones_completas <- confirmaciones_completas |>
 ```
 
 ### 2. Check duplicates
+
 ```{r}
 # Check weekly duplicates
 # Check for conflicting weekly-level values
@@ -609,6 +637,7 @@ rm(confirm_missigness, confirm_dupes, dupe_compare)
 ```
 
 #### Weekly duplicate merge
+
 ```{r}
 confirmacion_semanal <- confirmaciones_completas |> 
   group_by(vol_id, semana, bloque) |> 
@@ -622,6 +651,7 @@ glimpse(confirmacion_semanal)
 ```
 
 #### Daily duplicate merge
+
 ```{r}
 confirmacion_dia <- confirmaciones_completas |> 
   filter(!is.na(estado)) |> 
@@ -631,21 +661,26 @@ glimpse(confirmacion_dia)
 ```
 
 ### 3. Validate relationships between the tables
-Every record in `confirmacion_dia` should have a parent record in `confirmacion_semanal`.
-Should be 0 here
+
+Every record in `confirmacion_dia` should have a parent record in `confirmacion_semanal`. Should be 0 here
+
 ```{r}
 confirmacion_dia |>
   anti_join(confirmacion_semanal,
             by = c("vol_id", "semana", "bloque"))
 ```
+
 ### 4. Transform into two tables for postgres
+
 #### Add temp IDs to weekly confirmations
+
 ```{r}
 confirmacion_semanal <- confirmacion_semanal |> 
   mutate(id = row_number(), .before = 1)
 ```
 
 #### Add confirmation id's to daily confirmations
+
 ```{r}
 confirmacion_dia <- confirmacion_dia |> 
   left_join(confirmacion_semanal |> 
@@ -668,6 +703,7 @@ glimpse(confirmacion_dia)
 ```
 
 ## Validate migrations
+
 ```{r}
 # Validate confirmation relationships
 confirmacion_dia |>
@@ -679,9 +715,11 @@ confirmacion_dia |>
 ```
 
 ## Confirmaciones y centros
+
 Checking how the center names appear in this part of the legacy data to inform how it'll map to postgres.
 
 ### Centros lookup table
+
 ```{r}
 # Legacy centers in weekly confirmations
 confirmacion_semanal |> 
@@ -702,7 +740,9 @@ confirmacion_semanal <- confirmacion_semanal |>
             relationship = "many-to-one") |>
   relocate(centro_id, .after = centro)
 ```
+
 ### Centros y confirmaciones mapping validation
+
 ```{r}
 glimpse(confirmacion_semanal)
 
@@ -719,8 +759,11 @@ unmatched_centros |>
 confirmacion_semanal |>
   count(centro, centro_id, sort = TRUE)
 ```
+
 ## Confirm data types
+
 Also clarifying week start
+
 ```{r}
 # Convert weekly confirmation fields to SQL-compatible types
 confirmacion_semanal <- confirmacion_semanal |>
@@ -730,6 +773,7 @@ confirmacion_semanal <- confirmacion_semanal |>
 ```
 
 ### Type validation
+
 ```{r}
 glimpse(confirmacion_semanal)
 
@@ -738,7 +782,9 @@ sum(is.na(confirmacion_semanal$semana_inicio))
 ```
 
 ## Finalize daily table
+
 Double check `confirmacion_dia` has the same indentifier types as `confirmacion_semanal`
+
 ```{r}
 # Check column types
 glimpse(confirmacion_dia)
@@ -750,53 +796,58 @@ glimpse(confirmacion_dia)
 #             ids_invalidos = sum(!confirmacion_id %in% confirmacion_semanal$id))
 ```
 
-
-
-
 # Comunicados
+
 ```{r}
 old_data$comunicados |> 
   unnest()
 ```
 
 # Activities
+
 ```{r}
 old_data$acts
 ```
 
 # Activity Types
+
 ```{r}
 old_data$actTipos
 ```
 
 # Centers
+
 ```{r}
 old_data$centros
 ```
 
 # Documentation
+
 ```{r}
 old_data$docsPolitica
 ```
 
 # Tasks
+
 ```{r}
 old_data$tareas
 ```
 
 # Accept
+
 ```{r}
 old_data$aceptaciones
 ```
 
 # Pass
+
 ```{r}
 # old_data$passAdmin
 # old_data$passVoluntario
 ```
 
 # Password Meta
+
 ```{r}
 # old_data$passMeta
 ```
-
