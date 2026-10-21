@@ -1,11 +1,11 @@
 ALTER DEFAULT PRIVILEGES
 FOR ROLE postgres
 IN SCHEMA  public
-REVOKE SELECT, INSERT, UPDATE, DELETE
-ON TABLES FROM anon, authenticated, service_role;
+REVOKE ALL ON TABLES
+FROM anon, authenticated;
 
 ALTER DEFAULT PRIVILEGES
 FOR ROLE postgres
 IN SCHEMA public
-REVOKE USAGE, SELECT
-ON SEQUENCES FROM anon, authenticated, service_role;
+REVOKE ALL ON SEQUENCES
+FROM anon, authenticated;
